@@ -1,0 +1,29 @@
+body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: #f5f6fa;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+}
+#video-container {
+    position: relative;
+    display: inline-block;
+    margin-top: 30px;
+}
+#webcam, #output-canvas {
+    width: 640px;
+    height: 480px;
+    border-radius: 10px;
+    background: #222;
+}
+#output-canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+}
+#feedback {
+    margin-top: 20px;
+    font-size: 1.2em;
+    color: #333;
+}
