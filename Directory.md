@@ -1,17 +1,27 @@
-# 프로젝트 디렉토리 구조 
-```
-KUiotFinalProject/
-├── data/
-│ └── image.png # 바른자세 수치 추출용 데이터 이미지
-├── doc/
-│ ├── WORKFLOW.md # 전체 시스템 워크플로우 및 플로우차트 설명
-│ └── 플로우차트.png # 시스템 플로우차트 이미지
-├── yj/
-│ └── Back_End/
-│ └── MediaPipe_test/
-│ ├── webcam_pose_test.py # MediaPipe 기반 실시간 자세 분석(기본)
-│ ├── webcam_pose_test_neck.py # MediaPipe 기반 거북목 분석 및 등급화
-│ ├── analyze_image_pose.py # 이미지 기반 자세 분석(거북목 기준 각도 추출)
-│ └── ... # 기타 MediaPipe 관련 스크립트
-└── (기타 프론트엔드, 서버, 데이터, 설정 파일 등)
-```
+# Directory 구조 및 설명
+
+- flaskbook/
+  - apps/
+    - crud/
+      - __init__.py           # CRUD 블루프린트 초기화
+      - views.py              # 분석, 기록, 통계 등 주요 라우트/뷰 함수
+      - auth.py               # 회원가입, 로그인, 프로필 등 인증 관련 라우트
+      - models.py             # DB 모델(User, PostureRecord)
+      - neck.py               # MediaPipe 기반 자세 분석 로직
+      - static/               # JS, CSS, 이미지 등 정적 파일
+      - templates/
+        - crud/
+          - index.html        # 분석 메인 페이지
+          - login.html        # 로그인 페이지
+          - register.html     # 회원가입 페이지
+          - profile.html      # 프로필 페이지
+          - history.html      # 기록 페이지
+          - statistics.html   # 통계 페이지
+  - app.py                   # Flask 앱 팩토리 (앱 생성 함수)
+  - run.py                   # 서버 실행 스크립트
+  - init_db.py               # DB 초기화 스크립트
+  - create_test_data.py      # 테스트 데이터 생성 스크립트
+- requirements.txt           # 의존성 목록
+- README.md                  # 프로젝트 설명서
+- Directory.md               # 폴더/파일 구조 설명
+- instructions.md            # 설치/실행/초기화/테스트 안내

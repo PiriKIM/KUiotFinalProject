@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash
-from .models import User, db
+from .models import User, PostureRecord, db
 from datetime import datetime
 
 auth = Blueprint('auth', __name__)
@@ -96,11 +96,12 @@ def profile():
     recent_records = user.posture_records.order_by(PostureRecord.analysis_date.desc()).limit(10).all()
     
     # 통계 계산
-    total_analyses = len(user.posture_records)
+    total_analyses = user.posture_records.count()
     if total_analyses > 0:
-        avg_score = sum(record.calculate_overall_score() for record in user.posture_records) / total_analyses
+        all_records = user.posture_records.all()
+        avg_score = sum(record.calculate_overall_score() for record in all_records) / total_analyses
         grade_counts = {'A': 0, 'B': 0, 'C': 0, 'D': 0}
-        for record in user.posture_records:
+        for record in all_records:
             grade = record.calculate_overall_grade()
             grade_counts[grade] += 1
     else:

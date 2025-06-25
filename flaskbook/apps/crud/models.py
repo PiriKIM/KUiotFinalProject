@@ -14,7 +14,7 @@ class User(db.Model):
     last_login = db.Column(db.DateTime)
     
     # 관계 설정 - 사용자의 자세 분석 기록들
-    posture_records = db.relationship('PostureRecord', backref='user', lazy=True, cascade='all, delete-orphan')
+    posture_records = db.relationship('PostureRecord', backref='user', lazy='dynamic', cascade='all, delete-orphan')
     
     @property
     def password(self):

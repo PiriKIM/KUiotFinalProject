@@ -4,6 +4,7 @@ import cv2
 from .neck import PostureAnalyzer
 from .models import User, PostureRecord, db
 import mediapipe as mp
+from datetime import datetime, timedelta
 
 crud = Blueprint(
     'crud',
@@ -121,34 +122,23 @@ def statistics():
     user = User.query.get(session['user_id'])
     
     # 전체 통계
-    total_records = len(user.posture_records)
-    
+    total_records = user.posture_records.count()
     if total_records > 0:
-        # 평균 점수
-        avg_score = sum(record.calculate_overall_score() for record in user.posture_records) / total_records
-        
-        # 등급별 통계
+        all_records = user.posture_records.all()
+        avg_score = sum(record.calculate_overall_score() for record in all_records) / total_records
         grade_counts = {'A': 0, 'B': 0, 'C': 0, 'D': 0}
-        for record in user.posture_records:
+        for record in all_records:
             grade = record.calculate_overall_grade()
             grade_counts[grade] += 1
-        
-        # 최근 7일 통계
-        from datetime import datetime, timedelta
         week_ago = datetime.now() - timedelta(days=7)
-        recent_records = [r for r in user.posture_records if r.analysis_date >= week_ago]
+        recent_records = [r for r in all_records if r.analysis_date >= week_ago]
         recent_avg = sum(r.calculate_overall_score() for r in recent_records) / len(recent_records) if recent_records else 0
-        
-        # 월별 통계 (최근 6개월)
         monthly_stats = {}
         for i in range(6):
             month_start = datetime.now().replace(day=1) - timedelta(days=30*i)
             month_end = month_start.replace(day=28) + timedelta(days=4)
             month_end = month_end.replace(day=1) - timedelta(days=1)
-            
-            month_records = [r for r in user.posture_records 
-                           if month_start <= r.analysis_date <= month_end]
-            
+            month_records = [r for r in all_records if month_start <= r.analysis_date <= month_end]
             if month_records:
                 monthly_stats[month_start.strftime('%Y-%m')] = {
                     'count': len(month_records),
@@ -166,4 +156,5 @@ def statistics():
                          avg_score=avg_score,
                          grade_counts=grade_counts,
                          recent_avg=recent_avg,
-                         monthly_stats=monthly_stats)
+                         monthly_stats=monthly_stats,
+                         now=datetime.now())

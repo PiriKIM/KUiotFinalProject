@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프로필 - {{ user.username }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f5f5f5;
+        }
+        
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .navbar-brand {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .navbar-nav {
+            display: flex;
+            list-style: none;
+            gap: 20px;
+        }
+        
+        .navbar-nav a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        
+        .navbar-nav a:hover {
+            background-color: rgba(255,255,255,0.2);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .profile-header {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 40px;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .profile-name {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .profile-email {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        .profile-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .card h3 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        .recent-records {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .record-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .record-item:last-child {
+            border-bottom: none;
+        }
+        
+        .record-date {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .record-score {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .score-number {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .grade-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .grade-a { background-color: #28a745; }
+        .grade-b { background-color: #17a2b8; }
+        .grade-c { background-color: #ffc107; }
+        .grade-d { background-color: #dc3545; }
+        
+        .grade-distribution {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .grade-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .grade-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .grade-bar {
+            flex: 1;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            margin: 0 15px;
+            overflow: hidden;
+        }
+        
+        .grade-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .fill-a { background-color: #28a745; }
+        .fill-b { background-color: #17a2b8; }
+        .fill-c { background-color: #ffc107; }
+        .fill-d { background-color: #dc3545; }
+        
+        .no-records {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+            font-style: italic;
+        }
+        
+        @media (max-width: 768px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .profile-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">자세 분석 시스템</div>
+        <ul class="navbar-nav">
+            <li><a href="{{ url_for('crud.index') }}">분석</a></li>
+            <li><a href="{{ url_for('crud.history') }}">기록</a></li>
+            <li><a href="{{ url_for('crud.statistics') }}">통계</a></li>
+            <li><a href="{{ url_for('auth.profile') }}">프로필</a></li>
+            <li><a href="{{ url_for('auth.logout') }}">로그아웃</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <div class="profile-header">
+            <div class="profile-avatar">
+                {{ user.username[0].upper() }}
+            </div>
+            <h1 class="profile-name">{{ user.username }}</h1>
+            <p class="profile-email">{{ user.email }}</p>
+            <p>가입일: {{ user.created_at.strftime('%Y년 %m월 %d일') }}</p>
+            {% if user.last_login %}
+                <p>마지막 로그인: {{ user.last_login.strftime('%Y년 %m월 %d일 %H:%M') }}</p>
+            {% endif %}
+            
+            <div class="profile-stats">
+                <div class="stat-card">
+                    <div class="stat-number">{{ total_analyses }}</div>
+                    <div class="stat-label">총 분석 횟수</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ "%.1f"|format(avg_score) }}</div>
+                    <div class="stat-label">평균 점수</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ grade_counts.A + grade_counts.B }}</div>
+                    <div class="stat-label">양호 이상 (A+B)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ grade_counts.A }}</div>
+                    <div class="stat-label">최고 등급 (A)</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content-grid">
+            <div class="card">
+                <h3>최근 분석 기록</h3>
+                <div class="recent-records">
+                    {% if recent_records %}
+                        {% for record in recent_records %}
+                            <div class="record-item">
+                                <div class="record-date">
+                                    {{ record.analysis_date.strftime('%m월 %d일 %H:%M') }}
+                                </div>
+                                <div class="record-score">
+                                    <span class="score-number">{{ record.calculate_overall_score() }}</span>
+                                    <span class="grade-badge grade-{{ record.calculate_overall_grade().lower() }}">
+                                        {{ record.calculate_overall_grade() }}
+                                    </span>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="no-records">
+                            아직 분석 기록이 없습니다.<br>
+                            자세 분석을 시작해보세요!
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>등급별 분포</h3>
+                <div class="grade-distribution">
+                    {% if total_analyses > 0 %}
+                        <div class="grade-item">
+                            <div class="grade-label">
+                                <span class="grade-badge grade-a">A</span>
+                                <span>최고</span>
+                            </div>
+                            <div class="grade-bar">
+                                <div class="grade-fill fill-a" data-width="{{ (grade_counts.A / total_analyses * 100)|round(1) if total_analyses > 0 else 0 }}"></div>
+                            </div>
+                            <span>{{ grade_counts.A }}회 {% if total_analyses > 0 %}({{ "%.1f"|format(grade_counts.A / total_analyses * 100) }}%){% else %}(0.0%){% endif %}</span>
+                        </div>
+                        
+                        <div class="grade-item">
+                            <div class="grade-label">
+                                <span class="grade-badge grade-b">B</span>
+                                <span>양호</span>
+                            </div>
+                            <div class="grade-bar">
+                                <div class="grade-fill fill-b" data-width="{{ (grade_counts.B / total_analyses * 100)|round(1) if total_analyses > 0 else 0 }}"></div>
+                            </div>
+                            <span>{{ grade_counts.B }}회 {% if total_analyses > 0 %}({{ "%.1f"|format(grade_counts.B / total_analyses * 100) }}%){% else %}(0.0%){% endif %}</span>
+                        </div>
+                        
+                        <div class="grade-item">
+                            <div class="grade-label">
+                                <span class="grade-badge grade-c">C</span>
+                                <span>보통</span>
+                            </div>
+                            <div class="grade-bar">
+                                <div class="grade-fill fill-c" data-width="{{ (grade_counts.C / total_analyses * 100)|round(1) if total_analyses > 0 else 0 }}"></div>
+                            </div>
+                            <span>{{ grade_counts.C }}회 {% if total_analyses > 0 %}({{ "%.1f"|format(grade_counts.C / total_analyses * 100) }}%){% else %}(0.0%){% endif %}</span>
+                        </div>
+                        
+                        <div class="grade-item">
+                            <div class="grade-label">
+                                <span class="grade-badge grade-d">D</span>
+                                <span>개선 필요</span>
+                            </div>
+                            <div class="grade-bar">
+                                <div class="grade-fill fill-d" data-width="{{ (grade_counts.D / total_analyses * 100)|round(1) if total_analyses > 0 else 0 }}"></div>
+                            </div>
+                            <span>{{ grade_counts.D }}회 {% if total_analyses > 0 %}({{ "%.1f"|format(grade_counts.D / total_analyses * 100) }}%){% else %}(0.0%){% endif %}</span>
+                        </div>
+                    {% else %}
+                        <div class="no-records">
+                            분석 기록이 없어 통계를 표시할 수 없습니다.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 등급별 분포 차트 너비 설정
+        document.addEventListener('DOMContentLoaded', function() {
+            const gradeFills = document.querySelectorAll('.grade-fill');
+            gradeFills.forEach(function(fill) {
+                const width = fill.getAttribute('data-width');
+                fill.style.width = width + '%';
+            });
+        });
+    </script>
+</body>
+</html> 
