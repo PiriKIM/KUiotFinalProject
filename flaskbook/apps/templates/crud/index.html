@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>자세 분석</title>
+  <style>
+    .container { display: flex; height: 100vh; }
+    .left, .right { flex: 1; padding: 10px; }
+    video { width: 100%; border: 1px solid #ccc; }
+    #result { white-space: pre-wrap; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="left">
+      <video id="webcam" autoplay muted playsinline></video>
+      <button onclick="toggleCamera()">카메라 ON/OFF</button>
+    </div>
+    <div class="right">
+      <h3>분석 결과</h3>
+      <div id="result">분석 대기 중...</div>
+    </div>
+  </div>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <script src="{{ url_for('crud.static', filename='crud/script.js') }}"></script>
+</body>
+</html>
