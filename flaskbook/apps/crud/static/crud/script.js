@@ -3,6 +3,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
   const resultBox = document.getElementById('result');
+  const overallScore = document.getElementById('overall-score');
+  const scoreNumber = document.getElementById('score-number');
+  const scoreGrade = document.getElementById('score-grade');
 
   let stream = null;
   let intervalId = null;
@@ -51,6 +54,8 @@ document.addEventListener("DOMContentLoaded", () => {
     video.srcObject = null;
     clearInterval(intervalId);
     resultBox.innerText = "분석 대기 중...";
+    resultBox.className = "status";
+    overallScore.style.display = "none";
   }
 
   function startAnalyzing() {
@@ -73,19 +78,34 @@ document.addEventListener("DOMContentLoaded", () => {
         .then(data => {
           if (data.error) {
             resultBox.innerText = "사람이 감지되지 않았습니다.";
+            resultBox.className = "error";
+            overallScore.style.display = "none";
           } else {
-            resultBox.innerText = `
+            // 종합 점수 표시
+            scoreNumber.textContent = data.overall_score;
+            scoreGrade.textContent = `등급: ${data.overall_grade}`;
+            overallScore.style.display = "block";
+            
+            // 상세 분석 결과 표시
+            resultBox.innerHTML = `
+<strong>상세 분석 결과:</strong>
+
 [목] ${data.neck.grade_description} (${data.neck.neck_angle.toFixed(1)}°)
 [척추] ${data.spine.is_hunched ? "굽음" : "정상"}
 [어깨] ${data.shoulder.is_asymmetric ? "비대칭" : "정상"}
 [골반] ${data.pelvic.is_tilted ? "기울어짐" : "정상"}
 [척추 틀어짐] ${data.twist.is_twisted ? "있음" : "정상"}
+
+<small>분석 시간: ${new Date().toLocaleString()}</small>
             `.trim();
+            resultBox.className = "success";
           }
         })
         .catch(err => {
           console.error("[ERROR] 분석 요청 실패:", err);
           resultBox.innerText = "서버 오류로 분석 실패.";
+          resultBox.className = "error";
+          overallScore.style.display = "none";
         });
       }, 'image/jpeg');
     }, 1000);

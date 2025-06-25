@@ -18,6 +18,9 @@ def create_app():
     Migrate(app, db)       # Migrate 연동
 
     from apps.crud import views as crud_views
+    from apps.crud import auth as auth_views
+    
     app.register_blueprint(crud_views.crud, url_prefix='/crud')  # Blueprint 등록
+    app.register_blueprint(auth_views.auth, url_prefix='/auth')  # 인증 Blueprint 등록
 
     return app
