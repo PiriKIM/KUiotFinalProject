@@ -1,0 +1,360 @@
+.body-analysis-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.body-analysis-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.body-analysis-header h2 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+.body-analysis-header p {
+  color: #7f8c8d;
+  font-size: 16px;
+}
+
+.body-analysis-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+/* 비디오 섹션 */
+.video-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.video-container {
+  position: relative;
+  width: 100%;
+  height: 400px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.webcam-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.video-placeholder {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #95a5a6;
+}
+
+.video-placeholder i {
+  font-size: 48px;
+  margin-bottom: 10px;
+}
+
+.video-controls {
+  text-align: center;
+}
+
+.video-controls .btn {
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.video-controls .btn-primary {
+  background: #3498db;
+  color: white;
+}
+
+.video-controls .btn-primary:hover {
+  background: #2980b9;
+}
+
+.video-controls .btn-danger {
+  background: #e74c3c;
+  color: white;
+}
+
+.video-controls .btn-danger:hover {
+  background: #c0392b;
+}
+
+.video-controls .btn:disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
+}
+
+/* 분석 섹션 */
+.analysis-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.alert-danger {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.analysis-placeholder {
+  text-align: center;
+  color: #95a5a6;
+  padding: 40px 20px;
+}
+
+.analysis-placeholder i {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+/* 분석 결과 */
+.analysis-results {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.score-section {
+  text-align: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  color: white;
+}
+
+.score-section h3 {
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+.score-display {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 15px;
+}
+
+.current-score,
+.average-score {
+  text-align: center;
+}
+
+.score-value {
+  display: block;
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.score-label {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.score-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.score-fill {
+  height: 100%;
+  background: #2ecc71;
+  transition: width 0.3s ease;
+}
+
+/* 측정값 섹션 */
+.measurements-section,
+.angles-section {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.measurements-section h3,
+.angles-section h3 {
+  margin-bottom: 15px;
+  color: #2c3e50;
+  font-size: 16px;
+}
+
+.measurements-grid,
+.angles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 15px;
+}
+
+.measurement-item,
+.angle-item {
+  background: white;
+  padding: 12px;
+  border-radius: 6px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.measurement-label,
+.angle-label {
+  display: block;
+  font-size: 12px;
+  color: #7f8c8d;
+  margin-bottom: 5px;
+}
+
+.measurement-value,
+.angle-value {
+  display: block;
+  font-size: 16px;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+/* 피드백 섹션 */
+.feedback-section {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.feedback-section h3 {
+  margin-bottom: 15px;
+  color: #2c3e50;
+  font-size: 16px;
+}
+
+.feedback-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.feedback-message.good {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.feedback-message.warning {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+/* 권장사항 섹션 */
+.recommendations-section {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.recommendations-section h3 {
+  margin-bottom: 15px;
+  color: #2c3e50;
+  font-size: 16px;
+}
+
+.recommendations-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.recommendation-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e9ecef;
+  color: #495057;
+}
+
+.recommendation-item:last-child {
+  border-bottom: none;
+}
+
+.recommendation-item i {
+  color: #f39c12;
+  margin-top: 2px;
+}
+
+/* 세션 정보 */
+.session-info {
+  text-align: center;
+  padding: 15px;
+  background: #e9ecef;
+  border-radius: 8px;
+  color: #6c757d;
+  font-size: 14px;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .body-analysis-content {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .video-container {
+    height: 300px;
+  }
+  
+  .score-display {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .measurements-grid,
+  .angles-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .body-analysis-container {
+    padding: 10px;
+  }
+  
+  .video-container {
+    height: 250px;
+  }
+  
+  .measurements-grid,
+  .angles-grid {
+    grid-template-columns: 1fr;
+  }
+} 

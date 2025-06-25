@@ -1,0 +1,41 @@
+# FastAPI 및 웹 프레임워크
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# 데이터베이스
+sqlalchemy==2.0.23
+alembic==1.12.1
+psycopg2-binary==2.9.9
+
+# 인증 및 보안
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.0
+
+# AI 및 Computer Vision
+opencv-python==4.8.1.78
+mediapipe==0.10.7
+numpy==1.24.3
+pillow==10.0.1
+
+# TTS (Text-to-Speech)
+pyttsx3==2.90
+gtts==2.4.0
+
+# 유틸리티
+pydantic==2.5.0
+pydantic-settings==2.1.0
+httpx==0.25.2
+websockets==12.0
+
+# 테스트
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# 개발 도구
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1 
