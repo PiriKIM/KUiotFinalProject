@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>자세 분석 - {{ user.username }}</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Arial', sans-serif;
+      background: #f5f5f5;
+    }
+    
+    .navbar {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .navbar-brand {
+      font-size: 20px;
+      font-weight: bold;
+    }
+    
+    .navbar-nav {
+      display: flex;
+      list-style: none;
+      gap: 20px;
+    }
+    
+    .navbar-nav a {
+      color: white;
+      text-decoration: none;
+      padding: 8px 12px;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+    }
+    
+    .navbar-nav a:hover {
+      background-color: rgba(255,255,255,0.2);
+    }
+    
+    .container {
+      display: flex;
+      height: calc(100vh - 70px);
+      padding: 20px;
+      gap: 20px;
+    }
+    
+    .left, .right {
+      flex: 1;
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .video-container {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    video {
+      width: 100%;
+      max-width: 500px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+    }
+    
+    .controls {
+      margin-top: 15px;
+    }
+    
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: transform 0.2s;
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+    
+    .result-container {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .result-header {
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eee;
+    }
+    
+    .result-header h3 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    
+    .overall-score {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .score-number {
+      font-size: 36px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    
+    .score-grade {
+      font-size: 18px;
+      opacity: 0.9;
+    }
+    
+    #result {
+      flex: 1;
+      white-space: pre-wrap;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #333;
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #eee;
+      overflow-y: auto;
+    }
+    
+    .status {
+      color: #666;
+      font-style: italic;
+    }
+    
+    .error {
+      color: #d32f2f;
+    }
+    
+    .success {
+      color: #388e3c;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">자세 분석 시스템</div>
+    <ul class="navbar-nav">
+      <li><a href="{{ url_for('crud.index') }}">분석</a></li>
+      <li><a href="{{ url_for('crud.history') }}">기록</a></li>
+      <li><a href="{{ url_for('crud.statistics') }}">통계</a></li>
+      <li><a href="{{ url_for('auth.profile') }}">프로필</a></li>
+      <li><a href="{{ url_for('auth.logout') }}">로그아웃</a></li>
+    </ul>
+  </nav>
+
+  <div class="container">
+    <div class="left">
+      <div class="video-container">
+        <video id="webcam" autoplay muted playsinline></video>
+        <div class="controls">
+          <button class="btn" onclick="toggleCamera()">카메라 ON/OFF</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="right">
+      <div class="result-container">
+        <div class="result-header">
+          <h3>분석 결과</h3>
+          <p>안녕하세요, {{ user.username }}님!</p>
+        </div>
+        
+        <div class="overall-score" id="overall-score" style="display: none;">
+          <div class="score-number" id="score-number">0</div>
+          <div class="score-grade" id="score-grade">점수</div>
+        </div>
+        
+        <div id="result" class="status">분석 대기 중...</div>
+      </div>
+    </div>
+  </div>
+  
+  <canvas id="canvas" style="display:none;"></canvas>
+  <script src="{{ url_for('crud.static', filename='crud/script.js') }}"></script>
+</body>
+</html>

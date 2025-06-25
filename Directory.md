@@ -1,0 +1,27 @@
+# Directory 구조 및 설명
+
+- flaskbook/
+  - apps/
+    - crud/
+      - __init__.py           # CRUD 블루프린트 초기화
+      - views.py              # 분석, 기록, 통계 등 주요 라우트/뷰 함수
+      - auth.py               # 회원가입, 로그인, 프로필 등 인증 관련 라우트
+      - models.py             # DB 모델(User, PostureRecord)
+      - neck.py               # MediaPipe 기반 자세 분석 로직
+      - static/               # JS, CSS, 이미지 등 정적 파일
+      - templates/
+        - crud/
+          - index.html        # 분석 메인 페이지
+          - login.html        # 로그인 페이지
+          - register.html     # 회원가입 페이지
+          - profile.html      # 프로필 페이지
+          - history.html      # 기록 페이지
+          - statistics.html   # 통계 페이지
+  - app.py                   # Flask 앱 팩토리 (앱 생성 함수)
+  - run.py                   # 서버 실행 스크립트
+  - init_db.py               # DB 초기화 스크립트
+  - create_test_data.py      # 테스트 데이터 생성 스크립트
+- requirements.txt           # 의존성 목록
+- README.md                  # 프로젝트 설명서
+- Directory.md               # 폴더/파일 구조 설명
+- instructions.md            # 설치/실행/초기화/테스트 안내
