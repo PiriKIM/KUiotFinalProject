@@ -12,7 +12,7 @@
 - **UI**: 등급/설명 우상단 표시
 
 ## 파일 설명
-- `neck.py`: MediaPipe와 OpenCV 기반 실시간 자세 분석 메인 스크립트
+- `neck.py`: MediaPipe 기반 실시간 자세 분석 메인 스크립트
 
 ## 필요 환경
 - Python 3.7 이상
