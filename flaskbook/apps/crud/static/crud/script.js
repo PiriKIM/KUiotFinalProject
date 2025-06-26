@@ -15,6 +15,142 @@ document.addEventListener("DOMContentLoaded", () => {
   let intervalId = null;
   let currentState = "no_human_detected";
   let stateMessage = "카메라 앞에 앉아주세요";
+  let latestLandmarks = null; // 최신 landmarks 저장
+
+  // [AI 추가] FPS 측정 변수
+  let frameCount = 0;
+  let lastFpsUpdate = Date.now();
+  let currentFps = 0;
+  const fpsIndicator = document.getElementById('fps-indicator');
+
+  // [AI 추가] 스켈레톤 연결 정보 (mediapipe pose 기준 index)
+  const SKELETON_CONNECTIONS = [
+    [11, 12], // 어깨선
+    [11, 13], [13, 15], // 왼팔
+    [12, 14], [14, 16], // 오른팔
+    [11, 23], [12, 24], // 어깨-골반
+    [23, 24], // 골반선
+    [23, 25], [25, 27], // 왼다리
+    [24, 26], [26, 28], // 오른다리
+    [7, 11], [8, 12],   // 귀-어깨
+  ];
+
+  function updateFps() {
+    frameCount++;
+    const now = Date.now();
+    if (now - lastFpsUpdate >= 1000) {
+      currentFps = frameCount;
+      frameCount = 0;
+      lastFpsUpdate = now;
+      if (fpsIndicator) {
+        fpsIndicator.textContent = `FPS: ${currentFps}`;
+      }
+    }
+  }
+
+  // [AI 추가] landmarks와 스켈레톤을 canvas에 그림
+  function drawLandmarksAndSkeleton(landmarks) {
+    if (!landmarks) return;
+    ctx.save();
+    // 1. 스켈레톤(선) 그리기
+    ctx.strokeStyle = 'lime';
+    ctx.lineWidth = 2;
+    SKELETON_CONNECTIONS.forEach(([startIdx, endIdx]) => {
+      const start = landmarks.find(lm => lm.index === startIdx);
+      const end = landmarks.find(lm => lm.index === endIdx);
+      if (start && end) {
+        ctx.beginPath();
+        ctx.moveTo(start.x * canvas.width, start.y * canvas.height);
+        ctx.lineTo(end.x * canvas.width, end.y * canvas.height);
+        ctx.stroke();
+      }
+    });
+    // 2. 점(landmarks) 그리기
+    ctx.fillStyle = 'red';
+    landmarks.forEach(lm => {
+      ctx.beginPath();
+      ctx.arc(lm.x * canvas.width, lm.y * canvas.height, 5, 0, 2 * Math.PI);
+      ctx.fill();
+    });
+
+    // [AI 추가] 척추, 목, 골반 등 중간점 계산 및 표시
+    const getLm = idx => landmarks.find(lm => lm.index === idx);
+    // 목 중심점 (귀의 중간)
+    const leftEar = getLm(7), rightEar = getLm(8);
+    if (leftEar && rightEar) {
+      const neckX = (leftEar.x + rightEar.x) / 2;
+      const neckY = (leftEar.y + rightEar.y) / 2;
+      ctx.beginPath();
+      ctx.arc(neckX * canvas.width, neckY * canvas.height, 7, 0, 2 * Math.PI);
+      ctx.fillStyle = 'blue';
+      ctx.fill();
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('Neck', neckX * canvas.width + 8, neckY * canvas.height);
+    }
+    // 어깨 중심점
+    const leftShoulder = getLm(11), rightShoulder = getLm(12);
+    if (leftShoulder && rightShoulder) {
+      const shoulderX = (leftShoulder.x + rightShoulder.x) / 2;
+      const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+      ctx.beginPath();
+      ctx.arc(shoulderX * canvas.width, shoulderY * canvas.height, 7, 0, 2 * Math.PI);
+      ctx.fillStyle = 'orange';
+      ctx.fill();
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('Shoulder', shoulderX * canvas.width + 8, shoulderY * canvas.height);
+    }
+    // 골반 중심점
+    const leftHip = getLm(23), rightHip = getLm(24);
+    if (leftHip && rightHip) {
+      const hipX = (leftHip.x + rightHip.x) / 2;
+      const hipY = (leftHip.y + rightHip.y) / 2;
+      ctx.beginPath();
+      ctx.arc(hipX * canvas.width, hipY * canvas.height, 7, 0, 2 * Math.PI);
+      ctx.fillStyle = 'purple';
+      ctx.fill();
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('Hip', hipX * canvas.width + 8, hipY * canvas.height);
+    }
+    // 척추 중심점 (어깨-골반 중간)
+    if (leftShoulder && rightShoulder && leftHip && rightHip) {
+      const shoulderX = (leftShoulder.x + rightShoulder.x) / 2;
+      const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+      const hipX = (leftHip.x + rightHip.x) / 2;
+      const hipY = (leftHip.y + rightHip.y) / 2;
+      const spineX = (shoulderX + hipX) / 2;
+      const spineY = (shoulderY + hipY) / 2;
+      ctx.beginPath();
+      ctx.arc(spineX * canvas.width, spineY * canvas.height, 7, 0, 2 * Math.PI);
+      ctx.fillStyle = 'cyan';
+      ctx.fill();
+      ctx.fillStyle = 'black';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('Spine', spineX * canvas.width + 8, spineY * canvas.height);
+    }
+
+    // [AI 추가] 척추 중심선(목-어깨-골반) 표시
+    if (leftEar && rightEar && leftShoulder && rightShoulder && leftHip && rightHip) {
+      const neckX = (leftEar.x + rightEar.x) / 2;
+      const neckY = (leftEar.y + rightEar.y) / 2;
+      const shoulderX = (leftShoulder.x + rightShoulder.x) / 2;
+      const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+      const hipX = (leftHip.x + rightHip.x) / 2;
+      const hipY = (leftHip.y + rightHip.y) / 2;
+      ctx.save();
+      ctx.strokeStyle = 'deepskyblue';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(neckX * canvas.width, neckY * canvas.height);
+      ctx.lineTo(shoulderX * canvas.width, shoulderY * canvas.height);
+      ctx.lineTo(hipX * canvas.width, hipY * canvas.height);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
 
   // ▶︎ 권한 테스트용 콘솔 로그
   console.log("[DEBUG] DOMContentLoaded: 스크립트 로드됨.");
@@ -63,6 +199,8 @@ document.addEventListener("DOMContentLoaded", () => {
     cameraBtnText.textContent = "카메라 시작";
     updateStateDisplay("no_human_detected", "카메라가 종료되었습니다.");
     overallScore.style.display = "none";
+    latestLandmarks = null; // landmarks 초기화
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // canvas 초기화
   }
 
   function updateStateDisplay(state, message, stableTime = null) {
@@ -152,8 +290,18 @@ document.addEventListener("DOMContentLoaded", () => {
     intervalId = setInterval(() => {
       if (!stream || video.videoWidth === 0 || video.videoHeight === 0) return;
 
+      // [AI 추가] FPS 업데이트
+      updateFps();
+
+      // [AI 수정] canvas 크기를 비디오와 동일하게 설정
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
+      
+      // [AI 수정] canvas 스타일도 비디오와 동일하게 설정
+      canvas.style.width = video.style.width || '100%';
+      canvas.style.maxWidth = video.style.maxWidth || '500px';
+      
+      // [AI 수정] 비디오 프레임을 canvas에 그리기 (서버 전송용)
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       canvas.toBlob(blob => {
@@ -169,7 +317,17 @@ document.addEventListener("DOMContentLoaded", () => {
           if (data.error) {
             updateStateDisplay("no_human_detected", "사람이 감지되지 않았습니다.");
             overallScore.style.display = "none";
+            latestLandmarks = null; // landmarks 초기화
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // canvas 초기화
           } else {
+            // [AI 추가] landmarks 데이터 저장 및 표시
+            if (data.landmarks) {
+              latestLandmarks = data.landmarks;
+              // [AI 수정] 비디오 프레임을 다시 그린 후 스켈레톤 오버레이
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              drawLandmarksAndSkeleton(latestLandmarks);
+            }
+
             // 상태 정보 업데이트
             updateStateDisplay(data.state, data.state_message, data.stable_time);
             
@@ -211,6 +369,8 @@ document.addEventListener("DOMContentLoaded", () => {
           console.error("[ERROR] 분석 요청 실패:", err);
           updateStateDisplay("no_human_detected", "서버 오류로 분석 실패.");
           overallScore.style.display = "none";
+          latestLandmarks = null; // landmarks 초기화
+          ctx.clearRect(0, 0, canvas.width, canvas.height); // canvas 초기화
         });
       }, 'image/jpeg');
     }, 1000);

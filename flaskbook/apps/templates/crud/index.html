@@ -320,11 +320,17 @@
   <div class="container">
     <div class="left">
       <div class="video-container">
-        <video id="webcam" autoplay muted playsinline></video>
+        <div style="position: relative; display: inline-block;">
+          <video id="webcam" autoplay muted playsinline></video>
+          <canvas id="canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
+        </div>
         <div class="controls">
           <button class="btn" onclick="toggleCamera()">
             <span id="camera-btn-text">카메라 시작</span>
           </button>
+          <div id="fps-indicator" style="margin-top: 10px; color: white; font-size: 12px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 5px; display: inline-block;">
+            FPS: 0
+          </div>
         </div>
       </div>
       
@@ -374,7 +380,6 @@
     </div>
   </div>
   
-  <canvas id="canvas" style="display:none;"></canvas>
   <script src="{{ url_for('crud.static', filename='crud/script.js') }}"></script>
 </body>
 </html>

@@ -179,6 +179,12 @@ def analyze():
         if result.pose_landmarks:
             lm = result.pose_landmarks.landmark
             
+            # [AI 수정] 상체 랜드마크만 추출 (얼굴 제외, 귀부터 시작)
+            upper_body_landmarks = []
+            for i, landmark in enumerate(lm):
+                if i >= 7:  # 귀부터 시작 (7: LEFT_EAR, 8: RIGHT_EAR, 11: 어깨)
+                    upper_body_landmarks.append({'x': landmark.x, 'y': landmark.y, 'index': i})
+            
             # 상태 업데이트
             state_manager.update_state(lm)
             
@@ -220,6 +226,7 @@ def analyze():
                     print(f"데이터베이스 저장 오류: {e}")
                 
                 return jsonify({
+                    'landmarks': upper_body_landmarks,  # [AI 추가] 상체 랜드마크 반환
                     'state': state_manager.state,
                     'state_message': state_manager.get_state_message(),
                     'neck': neck_result,
@@ -232,19 +239,18 @@ def analyze():
                 })
             else:
                 # 분석 중이 아닐 때는 상태 정보만 반환
+                stable_time = None
+                if state_manager.state == "detecting_front_pose" and state_manager.front_pose_stable_start:
+                    stable_time = time.time() - state_manager.front_pose_stable_start
+                
                 return jsonify({
+                    'landmarks': upper_body_landmarks,  # [AI 추가] 상체 랜드마크 반환
                     'state': state_manager.state,
                     'state_message': state_manager.get_state_message(),
-                    'stable_time': time.time() - state_manager.state_start_time if state_manager.state == "detecting_front_pose" else None
+                    'stable_time': stable_time
                 })
         else:
-            # 사람이 감지되지 않았을 때
-            state_manager.update_state(None)
-            return jsonify({
-                'state': state_manager.state,
-                'state_message': state_manager.get_state_message(),
-                'error': 'No person detected'
-            })
+            return jsonify({'error': 'No person detected'})
 
 @crud.route('/history')
 @login_required
