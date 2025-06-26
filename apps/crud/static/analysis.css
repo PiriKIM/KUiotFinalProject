@@ -18,36 +18,37 @@
 .video-container {
     text-align: center;
     margin-bottom: 20px;
+    /* 2024-07-04 변경: 시각화 겹치기용 position, width, height 추가 */
     position: relative;
     width: 100%;
-    max-width: 800px;
-    aspect-ratio: 4 / 3;
-    margin-left: auto;
-    margin-right: auto;
-    background: #000;
+    max-width: 500px;
+    height: 375px;
 }
 
 .video-container video,
 .video-container canvas {
+    /* 2024-07-04 변경: 겹치기용 absolute, 크기 지정 */
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
     border-radius: 8px;
-    object-fit: cover;
 }
 
 .video-container canvas {
+    /* 2024-07-04 변경: canvas z-index, pointer-events */
     z-index: 2;
     pointer-events: none;
 }
 
 .video-container video {
+    /* 2024-07-04 변경: video z-index */
     z-index: 1;
 }
 
 .video-container .controls {
+    /* 2024-07-04 변경: controls z-index */
     position: relative;
     z-index: 3;
     margin-top: 15px;

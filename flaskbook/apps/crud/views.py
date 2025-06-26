@@ -48,15 +48,22 @@ def analyze():
 
         if result.pose_landmarks:
             lm = result.pose_landmarks.landmark
-            
-            # 자세 분석 수행
+
+            # [AI 수정] neck.py 방식에 맞게 얼굴 랜드마크 제외하고 귀(7번)부터 시작하는 상체 랜드마크만 추출
+            # 귀(7: LEFT_EAR, 8: RIGHT_EAR)부터 시작하여 상체 랜드마크만 포함
+            upper_body_landmarks = []
+            for i, landmark in enumerate(lm):
+                if i >= 7:  # 귀부터 시작 (7: LEFT_EAR, 8: RIGHT_EAR, 11: 어깨)
+                    upper_body_landmarks.append({'x': landmark.x, 'y': landmark.y, 'index': i})
+
+            # 자세 분석 수행 (전체 랜드마크 사용 - 분석 함수들이 전체 랜드마크를 기대함)
             neck_result = analyzer.analyze_turtle_neck_detailed(lm)
             spine_result = analyzer.analyze_spine_curvature(lm)
             shoulder_result = analyzer.analyze_shoulder_asymmetry(lm)
             pelvic_result = analyzer.analyze_pelvic_tilt(lm)
             twist_result = analyzer.analyze_spine_twisting(lm)
             
-            # 데이터베이스에 분석 결과 저장
+            # [AI 수정] 데이터베이스에 분석 결과 저장
             user = User.query.get(session['user_id'])
             posture_record = PostureRecord(
                 user_id=user.id,
@@ -85,6 +92,7 @@ def analyze():
                 print(f"데이터베이스 저장 오류: {e}")
             
             return jsonify({
+                'landmarks': upper_body_landmarks,  # [AI 수정] 상체 랜드마크만 반환
                 'neck': neck_result,
                 'spine': spine_result,
                 'shoulder': shoulder_result,

@@ -21,8 +21,9 @@
 
   <div class="container">
     <div class="left">
-      <div class="video-container">
+      <div class="video-container"> <!-- 2025-06-26 11:20 변경 25~29 라인-->
         <video id="webcam" autoplay muted playsinline></video>
+        <canvas id="canvas"></canvas>
         <div class="controls">
           <button class="btn" onclick="toggleCamera()">카메라 ON/OFF</button>
         </div>
@@ -34,6 +35,7 @@
         <div class="result-header">
           <h3>분석 결과</h3>
           <p>안녕하세요, {{ user.username }}님!</p>
+          <div id="fps-indicator" style="font-size:13px;color:#888;margin-top:4px;"></div>
         </div>
         
         <div class="overall-score" id="overall-score" style="display: none;">
