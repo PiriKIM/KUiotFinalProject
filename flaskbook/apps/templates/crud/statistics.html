@@ -4,294 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>통계 - {{ user.username }}</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Arial', sans-serif;
-            background: #f5f5f5;
-        }
-        
-        .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .navbar-brand {
-            font-size: 20px;
-            font-weight: bold;
-        }
-        
-        .navbar-nav {
-            display: flex;
-            list-style: none;
-            gap: 20px;
-        }
-        
-        .navbar-nav a {
-            color: white;
-            text-decoration: none;
-            padding: 8px 12px;
-            border-radius: 5px;
-            transition: background-color 0.3s;
-        }
-        
-        .navbar-nav a:hover {
-            background-color: rgba(255,255,255,0.2);
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .page-header {
-            background: white;
-            border-radius: 10px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .page-title {
-            font-size: 28px;
-            color: #333;
-            margin-bottom: 10px;
-        }
-        
-        .page-subtitle {
-            color: #666;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .stat-card {
-            background: white;
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .stat-card h3 {
-            color: #333;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #eee;
-        }
-        
-        .overview-stats {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-        }
-        
-        .overview-item {
-            text-align: center;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-        
-        .overview-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: #667eea;
-            margin-bottom: 5px;
-        }
-        
-        .overview-label {
-            font-size: 14px;
-            color: #666;
-        }
-        
-        .grade-chart {
-            margin-top: 20px;
-        }
-        
-        .grade-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .grade-item:last-child {
-            border-bottom: none;
-        }
-        
-        .grade-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .grade-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-            color: white;
-        }
-        
-        .grade-a { background-color: #28a745; }
-        .grade-b { background-color: #17a2b8; }
-        .grade-c { background-color: #ffc107; }
-        .grade-d { background-color: #dc3545; }
-        
-        .grade-bar {
-            flex: 1;
-            height: 8px;
-            background: #e9ecef;
-            border-radius: 4px;
-            margin: 0 15px;
-            overflow: hidden;
-        }
-        
-        .grade-fill {
-            height: 100%;
-            border-radius: 4px;
-            transition: width 0.3s ease;
-        }
-        
-        .fill-a { background-color: #28a745; }
-        .fill-b { background-color: #17a2b8; }
-        .fill-c { background-color: #ffc107; }
-        .fill-d { background-color: #dc3545; }
-        
-        .trend-chart {
-            margin-top: 20px;
-        }
-        
-        .trend-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .trend-item:last-child {
-            border-bottom: none;
-        }
-        
-        .trend-period {
-            font-weight: 500;
-            color: #333;
-        }
-        
-        .trend-score {
-            font-weight: bold;
-            color: #667eea;
-        }
-        
-        .trend-count {
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .monthly-chart {
-            margin-top: 20px;
-        }
-        
-        .month-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            margin-bottom: 10px;
-        }
-        
-        .month-label {
-            font-weight: 500;
-            color: #333;
-        }
-        
-        .month-stats {
-            display: flex;
-            gap: 20px;
-            align-items: center;
-        }
-        
-        .month-score {
-            font-weight: bold;
-            color: #667eea;
-        }
-        
-        .month-count {
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .no-data {
-            text-align: center;
-            padding: 40px;
-            color: #666;
-            font-style: italic;
-        }
-        
-        .progress-ring {
-            width: 120px;
-            height: 120px;
-            margin: 0 auto 15px;
-        }
-        
-        .progress-ring circle {
-            fill: none;
-            stroke-width: 8;
-        }
-        
-        .progress-ring .bg {
-            stroke: #e9ecef;
-        }
-        
-        .progress-ring .progress {
-            stroke: #667eea;
-            stroke-linecap: round;
-            transform: rotate(-90deg);
-            transform-origin: 50% 50%;
-            transition: stroke-dashoffset 0.3s ease;
-        }
-        
-        .progress-text {
-            text-align: center;
-            font-size: 24px;
-            font-weight: bold;
-            color: #667eea;
-        }
-        
-        @media (max-width: 768px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .overview-stats {
-                grid-template-columns: 1fr;
-            }
-            
-            .month-stats {
-                flex-direction: column;
-                gap: 5px;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('crud.static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('crud.static', filename='statistics.css') }}">
 </head>
 <body>
     <nav class="navbar">
@@ -307,187 +21,66 @@
 
     <div class="container">
         <div class="page-header">
-            <h1 class="page-title">통계</h1>
+            <h1 class="page-title">분석 통계</h1>
             <p class="page-subtitle">{{ user.username }}님의 자세 분석 통계입니다.</p>
         </div>
         
         <div class="stats-grid">
-            <!-- 전체 개요 -->
-            <div class="stat-card">
+            <div class="card">
                 <h3>전체 개요</h3>
-                {% if total_records > 0 %}
-                    <div class="overview-stats">
-                        <div class="overview-item">
-                            <div class="overview-number">{{ total_records }}</div>
-                            <div class="overview-label">총 분석 횟수</div>
-                        </div>
-                        <div class="overview-item">
-                            <div class="overview-number">{{ "%.1f"|format(avg_score) }}</div>
-                            <div class="overview-label">평균 점수</div>
-                        </div>
-                        <div class="overview-item">
-                            <div class="overview-number">{{ "%.1f"|format(recent_avg) }}</div>
-                            <div class="overview-label">최근 7일 평균</div>
-                        </div>
-                        <div class="overview-item">
-                            <div class="overview-number">{{ grade_counts.A + grade_counts.B }}</div>
-                            <div class="overview-label">양호 이상 (A+B)</div>
-                        </div>
+                <div class="overview-stats">
+                    <div class="overview-item">
+                        <div class="overview-number">{{ total_records }}</div>
+                        <div class="overview-label">총 분석 횟수</div>
                     </div>
-                    
-                    <!-- 원형 진행률 차트 -->
-                    <div style="text-align: center; margin-top: 20px;">
-                        <svg class="progress-ring" width="120" height="120">
-                            <circle class="bg" cx="60" cy="60" r="52"></circle>
-                            <circle class="progress" cx="60" cy="60" r="52" 
-                                    stroke-dasharray="{{ 2 * 3.14159 * 52 }}" 
-                                    stroke-dashoffset="{{ 2 * 3.14159 * 52 * (1 - avg_score / 100) }}"></circle>
-                        </svg>
-                        <div class="progress-text">{{ "%.0f"|format(avg_score) }}점</div>
+                    <div class="overview-item">
+                        <div class="overview-number">{{ average_score|round(1) }}</div>
+                        <div class="overview-label">평균 점수</div>
                     </div>
-                {% else %}
-                    <div class="no-data">
-                        아직 분석 데이터가 없습니다.
+                    <div class="overview-item">
+                        <div class="overview-number">{{ best_score }}</div>
+                        <div class="overview-label">최고 점수</div>
                     </div>
-                {% endif %}
+                    <div class="overview-item">
+                        <div class="overview-number">{{ improvement_rate|round(1) }}%</div>
+                        <div class="overview-label">개선률</div>
+                    </div>
+                </div>
             </div>
             
-            <!-- 등급별 분포 -->
-            <div class="stat-card">
+            <div class="card">
                 <h3>등급별 분포</h3>
-                {% if total_records > 0 %}
-                    <div class="grade-chart">
-                        <div class="grade-item">
-                            <div class="grade-info">
-                                <span class="grade-badge grade-a">A</span>
-                                <span>최고</span>
-                            </div>
-                            <div class="grade-bar">
-                                <div class="grade-fill fill-a" data-width="{{ (grade_counts.A / total_records * 100)|round(1) if total_records > 0 else 0 }}"></div>
-                            </div>
-                            <span>{{ grade_counts.A }}회 {% if total_records > 0 %}({{ "%.1f"|format(grade_counts.A / total_records * 100) }}%){% else %}(0.0%){% endif %}</span>
+                <div class="grade-chart">
+                    {% for grade, count in grade_distribution.items() %}
+                    <div class="grade-item">
+                        <div class="grade-info">
+                            <span class="grade-badge grade-{{ grade.lower() }}">{{ grade }}</span>
+                            <span>{{ count }}회</span>
                         </div>
-                        
-                        <div class="grade-item">
-                            <div class="grade-info">
-                                <span class="grade-badge grade-b">B</span>
-                                <span>양호</span>
-                            </div>
-                            <div class="grade-bar">
-                                <div class="grade-fill fill-b" data-width="{{ (grade_counts.B / total_records * 100)|round(1) if total_records > 0 else 0 }}"></div>
-                            </div>
-                            <span>{{ grade_counts.B }}회 {% if total_records > 0 %}({{ "%.1f"|format(grade_counts.B / total_records * 100) }}%){% else %}(0.0%){% endif %}</span>
+                        <div class="grade-bar">
+                            <div class="grade-fill fill-{{ grade.lower() }}" style="width: {{ (count / total_records * 100) | round(1) }}%"></div>
                         </div>
-                        
-                        <div class="grade-item">
-                            <div class="grade-info">
-                                <span class="grade-badge grade-c">C</span>
-                                <span>보통</span>
-                            </div>
-                            <div class="grade-bar">
-                                <div class="grade-fill fill-c" data-width="{{ (grade_counts.C / total_records * 100)|round(1) if total_records > 0 else 0 }}"></div>
-                            </div>
-                            <span>{{ grade_counts.C }}회 {% if total_records > 0 %}({{ "%.1f"|format(grade_counts.C / total_records * 100) }}%){% else %}(0.0%){% endif %}</span>
-                        </div>
-                        
-                        <div class="grade-item">
-                            <div class="grade-info">
-                                <span class="grade-badge grade-d">D</span>
-                                <span>개선 필요</span>
-                            </div>
-                            <div class="grade-bar">
-                                <div class="grade-fill fill-d" data-width="{{ (grade_counts.D / total_records * 100)|round(1) if total_records > 0 else 0 }}"></div>
-                            </div>
-                            <span>{{ grade_counts.D }}회 {% if total_records > 0 %}({{ "%.1f"|format(grade_counts.D / total_records * 100) }}%){% else %}(0.0%){% endif %}</span>
-                        </div>
+                        <span>{{ (count / total_records * 100) | round(1) }}%</span>
                     </div>
-                {% else %}
-                    <div class="no-data">
-                        분석 데이터가 없어 통계를 표시할 수 없습니다.
-                    </div>
-                {% endif %}
+                    {% endfor %}
+                </div>
             </div>
-            
-            <!-- 월별 통계 -->
-            <div class="stat-card">
-                <h3>월별 통계 (최근 6개월)</h3>
-                {% if monthly_stats %}
-                    <div class="monthly-chart">
-                        {% for month, stats in monthly_stats.items() %}
-                            <div class="month-item">
-                                <div class="month-label">{{ month }}</div>
-                                <div class="month-stats">
-                                    <div class="month-score">{{ "%.1f"|format(stats.avg_score) }}점</div>
-                                    <div class="month-count">{{ stats.count }}회</div>
-                                </div>
-                            </div>
-                        {% endfor %}
+        </div>
+        
+        <div class="card">
+            <h3>기간별 추이</h3>
+            <div class="trend-chart">
+                {% for period, data in trend_data.items() %}
+                <div class="trend-item">
+                    <div class="trend-period">{{ period }}</div>
+                    <div class="trend-score">{{ data.score|round(1) }}점</div>
+                    <div class="trend-change {{ data.change_type }}">
+                        {% if data.change > 0 %}+{% endif %}{{ data.change|round(1) }}%
                     </div>
-                {% else %}
-                    <div class="no-data">
-                        월별 데이터가 없습니다.
-                    </div>
-                {% endif %}
-            </div>
-            
-            <!-- 트렌드 분석 -->
-            <div class="stat-card">
-                <h3>트렌드 분석</h3>
-                {% if total_records > 0 %}
-                    <div class="trend-chart">
-                        <div class="trend-item">
-                            <div class="trend-period">전체 평균</div>
-                            <div class="trend-score">{{ "%.1f"|format(avg_score) }}점</div>
-                            <div class="trend-count">{{ total_records }}회</div>
-                        </div>
-                        
-                        <div class="trend-item">
-                            <div class="trend-period">최근 7일</div>
-                            <div class="trend-score">{{ "%.1f"|format(recent_avg) }}점</div>
-                            <div class="trend-count">
-                                {% set recent_count = 0 %}
-                                {% for record in user.posture_records %}
-                                    {% if (record.analysis_date - now).days >= -7 %}
-                                        {% set recent_count = recent_count + 1 %}
-                                    {% endif %}
-                                {% endfor %}
-                                {{ recent_count }}회
-                            </div>
-                        </div>
-                        
-                        <div class="trend-item">
-                            <div class="trend-period">최고 점수</div>
-                            <div class="trend-score">
-                                {% set max_score = 0 %}
-                                {% for record in user.posture_records %}
-                                    {% set score = record.calculate_overall_score() %}
-                                    {% if score > max_score %}
-                                        {% set max_score = score %}
-                                    {% endif %}
-                                {% endfor %}
-                                {{ max_score }}점
-                            </div>
-                            <div class="trend-count">최고 기록</div>
-                        </div>
-                    </div>
-                {% else %}
-                    <div class="no-data">
-                        트렌드 분석을 위한 데이터가 부족합니다.
-                    </div>
-                {% endif %}
+                </div>
+                {% endfor %}
             </div>
         </div>
     </div>
-
-    <script>
-        // 등급별 분포 차트 너비 설정
-        document.addEventListener('DOMContentLoaded', function() {
-            const gradeFills = document.querySelectorAll('.grade-fill');
-            gradeFills.forEach(function(fill) {
-                const width = fill.getAttribute('data-width');
-                fill.style.width = width + '%';
-            });
-        });
-    </script>
 </body>
 </html> 
