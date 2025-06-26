@@ -9,6 +9,8 @@ from apps.crud.models import User, PostureRecord
 from datetime import datetime, timedelta
 import random
 
+
+
 def create_test_data():
     """테스트 데이터 생성"""
     app = create_app()
