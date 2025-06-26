@@ -5,6 +5,7 @@ from .neck import PostureAnalyzer
 from .models import User, PostureRecord, db
 import mediapipe as mp
 from datetime import datetime, timedelta
+import time
 
 crud = Blueprint(
     'crud',
@@ -14,6 +15,135 @@ crud = Blueprint(
 )
 
 analyzer = PostureAnalyzer()
+
+# 상태 관리 클래스
+class PoseStateManager:
+    def __init__(self):
+        self.state = "no_human_detected"
+        self.state_start_time = time.time()
+        self.last_state_change = time.time()
+        self.front_pose_frames = []  # 20프레임 저장용
+        self.front_pose_area = None
+        self.prev_landmarks = None
+        self.front_pose_stable_start = None
+        self.no_landmark_start = None
+        self.SIDE_RATIO = 0.7  # 측면 면적 비율 기준
+        self.STABLE_DURATION = 2.0  # 정면 안정화 시간
+        self.MOVE_THRESHOLD = 0.02  # landmark 이동량 임계값
+        self.NO_LANDMARK_TIMEOUT = 10.0  # 관절 미감지 10초
+
+    def update_state(self, landmarks):
+        current_time = time.time()
+        # 상태 1: no_human_detected
+        if self.state == "no_human_detected":
+            if landmarks is not None:
+                print("[전이] no_human_detected → detecting_front_pose")
+                self.state = "detecting_front_pose"
+                self.state_start_time = current_time
+                self.front_pose_frames = []
+                self.prev_landmarks = None
+                self.front_pose_stable_start = None
+                self.no_landmark_start = None
+        # 상태 2: detecting_front_pose
+        elif self.state == "detecting_front_pose":
+            if landmarks is None:
+                print("[전이] detecting_front_pose → no_human_detected")
+                self.state = "no_human_detected"
+                self.state_start_time = current_time
+                self.front_pose_frames = []
+                self.prev_landmarks = None
+                self.front_pose_stable_start = None
+                self.no_landmark_start = current_time
+                return
+            # 어깨, 귀, 코 좌표만 추출
+            key_indices = [mp.solutions.pose.PoseLandmark.LEFT_SHOULDER.value, mp.solutions.pose.PoseLandmark.RIGHT_SHOULDER.value,
+                           mp.solutions.pose.PoseLandmark.LEFT_EAR.value, mp.solutions.pose.PoseLandmark.RIGHT_EAR.value,
+                           mp.solutions.pose.PoseLandmark.NOSE.value]
+            keypoints = np.array([[landmarks[i].x, landmarks[i].y] for i in key_indices])
+            # 20프레임 저장
+            self.front_pose_frames.append(keypoints)
+            if len(self.front_pose_frames) > 20:
+                self.front_pose_frames.pop(0)
+            # 이동량 계산
+            if self.prev_landmarks is not None:
+                move = np.linalg.norm(keypoints - self.prev_landmarks, axis=1).mean()
+            else:
+                move = 0
+            self.prev_landmarks = keypoints
+            # 안정화 시작 체크
+            if move < self.MOVE_THRESHOLD:
+                if self.front_pose_stable_start is None:
+                    self.front_pose_stable_start = current_time
+                elif current_time - self.front_pose_stable_start >= self.STABLE_DURATION:
+                    # 평균 면적 계산 (어깨-귀 사각형 넓이)
+                    arr = np.array(self.front_pose_frames)
+                    left_shoulder = arr[:,0]
+                    right_shoulder = arr[:,1]
+                    left_ear = arr[:,2]
+                    right_ear = arr[:,3]
+                    # 어깨-귀 사각형 넓이(대략적)
+                    width = np.linalg.norm(left_shoulder - right_shoulder, axis=1).mean()
+                    height = np.linalg.norm(left_ear - left_shoulder, axis=1).mean()
+                    area = width * height
+                    self.front_pose_area = area
+                    print(f"[전이] detecting_front_pose → waiting_side_pose (정면 안정화, 면적:{area:.4f})")
+                    self.state = "waiting_side_pose"
+                    self.state_start_time = current_time
+                    self.last_state_change = current_time
+                    self.front_pose_frames = []
+                    self.prev_landmarks = None
+                    self.front_pose_stable_start = None
+            else:
+                self.front_pose_stable_start = None
+        # 상태 3: waiting_side_pose
+        elif self.state == "waiting_side_pose":
+            if landmarks is None:
+                if self.no_landmark_start is None:
+                    self.no_landmark_start = current_time
+                elif current_time - self.no_landmark_start > self.NO_LANDMARK_TIMEOUT:
+                    print("[전이] waiting_side_pose → no_human_detected (관절 미감지 10초)")
+                    self.state = "no_human_detected"
+                    self.state_start_time = current_time
+                    self.front_pose_area = None
+                    self.no_landmark_start = None
+                return
+            else:
+                self.no_landmark_start = None
+            # 측면 판별: 정면 면적 대비 70% 이하로 줄어들면
+            key_indices = [mp.solutions.pose.PoseLandmark.LEFT_SHOULDER.value, mp.solutions.pose.PoseLandmark.RIGHT_SHOULDER.value,
+                           mp.solutions.pose.PoseLandmark.LEFT_EAR.value, mp.solutions.pose.PoseLandmark.RIGHT_EAR.value]
+            keypoints = np.array([[landmarks[i].x, landmarks[i].y] for i in key_indices])
+            width = np.linalg.norm(keypoints[0] - keypoints[1])
+            height = np.linalg.norm(keypoints[2] - keypoints[0])
+            area = width * height
+            if self.front_pose_area and area < self.front_pose_area * self.SIDE_RATIO:
+                print(f"[전이] waiting_side_pose → analyzing_side_pose (측면 감지, 면적:{area:.4f})")
+                self.state = "analyzing_side_pose"
+                self.state_start_time = current_time
+                self.last_state_change = current_time
+        # 상태 4: analyzing_side_pose
+        elif self.state == "analyzing_side_pose":
+            if landmarks is None:
+                print("[전이] analyzing_side_pose → no_human_detected (관절 미감지)")
+                self.state = "no_human_detected"
+                self.state_start_time = current_time
+                self.front_pose_area = None
+                self.no_landmark_start = current_time
+            # 분석 동작은 외부에서 수행
+
+    def get_state_message(self):
+        if self.state == "no_human_detected":
+            return "카메라 앞에 앉아주세요"
+        elif self.state == "detecting_front_pose":
+            return "정면 자세 측정을 시작합니다."
+        elif self.state == "waiting_side_pose":
+            return "카메라에 왼쪽 또는 오른쪽 측면을 보이고 앉아주세요"
+        elif self.state == "analyzing_side_pose":
+            return "바른자세 측정을 시작합니다. 학습을 시작하세요."
+        return "알 수 없는 상태"
+
+# 전역 상태 관리자 인스턴스
+state_manager = PoseStateManager()
 
 def login_required(f):
     """로그인 필요 데코레이터"""
@@ -49,52 +179,72 @@ def analyze():
         if result.pose_landmarks:
             lm = result.pose_landmarks.landmark
             
-            # 자세 분석 수행
-            neck_result = analyzer.analyze_turtle_neck_detailed(lm)
-            spine_result = analyzer.analyze_spine_curvature(lm)
-            shoulder_result = analyzer.analyze_shoulder_asymmetry(lm)
-            pelvic_result = analyzer.analyze_pelvic_tilt(lm)
-            twist_result = analyzer.analyze_spine_twisting(lm)
+            # 상태 업데이트
+            state_manager.update_state(lm)
             
-            # 데이터베이스에 분석 결과 저장
-            user = User.query.get(session['user_id'])
-            posture_record = PostureRecord(
-                user_id=user.id,
-                neck_angle=neck_result['neck_angle'],
-                neck_grade=neck_result['grade'],
-                neck_description=neck_result['grade_description'],
-                spine_is_hunched=spine_result['is_hunched'],
-                spine_angle=spine_result['spine_angle'],
-                shoulder_is_asymmetric=shoulder_result['is_asymmetric'],
-                shoulder_height_difference=shoulder_result['height_difference'],
-                pelvic_is_tilted=pelvic_result['is_tilted'],
-                pelvic_angle=pelvic_result['pelvic_angle'],
-                spine_is_twisted=twist_result['is_twisted'],
-                spine_alignment=twist_result['spine_alignment']
-            )
-            
-            # 종합 점수 계산
-            posture_record.overall_score = posture_record.calculate_overall_score()
-            posture_record.overall_grade = posture_record.calculate_overall_grade()
-            
-            try:
-                db.session.add(posture_record)
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                print(f"데이터베이스 저장 오류: {e}")
-            
-            return jsonify({
-                'neck': neck_result,
-                'spine': spine_result,
-                'shoulder': shoulder_result,
-                'pelvic': pelvic_result,
-                'twist': twist_result,
-                'overall_score': posture_record.overall_score,
-                'overall_grade': posture_record.overall_grade
-            })
+            # 분석 중일 때만 자세 분석 실행
+            if state_manager.state == "analyzing_side_pose":
+                # 자세 분석 수행
+                neck_result = analyzer.analyze_turtle_neck_detailed(lm)
+                spine_result = analyzer.analyze_spine_curvature(lm)
+                shoulder_result = analyzer.analyze_shoulder_asymmetry(lm)
+                pelvic_result = analyzer.analyze_pelvic_tilt(lm)
+                twist_result = analyzer.analyze_spine_twisting(lm)
+                
+                # 데이터베이스에 분석 결과 저장
+                user = User.query.get(session['user_id'])
+                posture_record = PostureRecord(
+                    user_id=user.id,
+                    neck_angle=neck_result['neck_angle'],
+                    neck_grade=neck_result['grade'],
+                    neck_description=neck_result['grade_description'],
+                    spine_is_hunched=spine_result['is_hunched'],
+                    spine_angle=spine_result['spine_angle'],
+                    shoulder_is_asymmetric=shoulder_result['is_asymmetric'],
+                    shoulder_height_difference=shoulder_result['height_difference'],
+                    pelvic_is_tilted=pelvic_result['is_tilted'],
+                    pelvic_angle=pelvic_result['pelvic_angle'],
+                    spine_is_twisted=twist_result['is_twisted'],
+                    spine_alignment=twist_result['spine_alignment']
+                )
+                
+                # 종합 점수 계산
+                posture_record.overall_score = posture_record.calculate_overall_score()
+                posture_record.overall_grade = posture_record.calculate_overall_grade()
+                
+                try:
+                    db.session.add(posture_record)
+                    db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    print(f"데이터베이스 저장 오류: {e}")
+                
+                return jsonify({
+                    'state': state_manager.state,
+                    'state_message': state_manager.get_state_message(),
+                    'neck': neck_result,
+                    'spine': spine_result,
+                    'shoulder': shoulder_result,
+                    'pelvic': pelvic_result,
+                    'twist': twist_result,
+                    'overall_score': posture_record.overall_score,
+                    'overall_grade': posture_record.overall_grade
+                })
+            else:
+                # 분석 중이 아닐 때는 상태 정보만 반환
+                return jsonify({
+                    'state': state_manager.state,
+                    'state_message': state_manager.get_state_message(),
+                    'stable_time': time.time() - state_manager.state_start_time if state_manager.state == "detecting_front_pose" else None
+                })
         else:
-            return jsonify({'error': 'No person detected'})
+            # 사람이 감지되지 않았을 때
+            state_manager.update_state(None)
+            return jsonify({
+                'state': state_manager.state,
+                'state_message': state_manager.get_state_message(),
+                'error': 'No person detected'
+            })
 
 @crud.route('/history')
 @login_required

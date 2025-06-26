@@ -13,17 +13,19 @@
     
     body {
       font-family: 'Arial', sans-serif;
-      background: #f5f5f5;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
     }
     
     .navbar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
       color: white;
       padding: 15px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 20px rgba(0,0,0,0.1);
     }
     
     .navbar-brand {
@@ -42,11 +44,12 @@
       text-decoration: none;
       padding: 8px 12px;
       border-radius: 5px;
-      transition: background-color 0.3s;
+      transition: all 0.3s;
     }
     
     .navbar-nav a:hover {
       background-color: rgba(255,255,255,0.2);
+      transform: translateY(-2px);
     }
     
     .container {
@@ -58,10 +61,12 @@
     
     .left, .right {
       flex: 1;
-      background: white;
-      border-radius: 10px;
-      padding: 20px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
     
     .video-container {
@@ -72,27 +77,35 @@
     video {
       width: 100%;
       max-width: 500px;
-      border: 2px solid #ddd;
-      border-radius: 8px;
+      border: 3px solid #ddd;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
     }
     
     .controls {
-      margin-top: 15px;
+      margin-top: 20px;
     }
     
     .btn {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
       border: none;
-      padding: 10px 20px;
-      border-radius: 5px;
+      padding: 12px 24px;
+      border-radius: 8px;
       cursor: pointer;
       font-size: 14px;
-      transition: transform 0.2s;
+      font-weight: bold;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
     }
     
     .btn:hover {
-      transform: translateY(-2px);
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn:active {
+      transform: translateY(-1px);
     }
     
     .result-container {
@@ -102,33 +115,40 @@
     }
     
     .result-header {
-      margin-bottom: 20px;
-      padding-bottom: 15px;
+      margin-bottom: 25px;
+      padding-bottom: 20px;
       border-bottom: 2px solid #eee;
     }
     
     .result-header h3 {
       color: #333;
       margin-bottom: 10px;
+      font-size: 24px;
+    }
+    
+    .result-header p {
+      color: #666;
+      font-size: 16px;
     }
     
     .overall-score {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      padding: 15px;
-      border-radius: 8px;
+      padding: 20px;
+      border-radius: 12px;
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 25px;
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
     }
     
     .score-number {
-      font-size: 36px;
+      font-size: 42px;
       font-weight: bold;
-      margin-bottom: 5px;
+      margin-bottom: 8px;
     }
     
     .score-grade {
-      font-size: 18px;
+      font-size: 20px;
       opacity: 0.9;
     }
     
@@ -139,23 +159,149 @@
       line-height: 1.6;
       color: #333;
       background: #f9f9f9;
-      padding: 15px;
-      border-radius: 8px;
-      border: 1px solid #eee;
+      padding: 20px;
+      border-radius: 12px;
+      border: 2px solid #eee;
       overflow-y: auto;
+      transition: all 0.3s ease;
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     
     .status {
       color: #666;
       font-style: italic;
+      text-align: center;
     }
     
     .error {
       color: #d32f2f;
+      background: #ffebee;
+      border-color: #ffcdd2;
     }
     
     .success {
       color: #388e3c;
+      background: #e8f5e8;
+      border-color: #c8e6c9;
+    }
+    
+    /* 상태별 스타일 */
+    .state-no_human_detected {
+      background: #ffebee;
+      border-color: #ffcdd2;
+      color: #d32f2f;
+    }
+    
+    .state-detecting_front_pose {
+      background: #e3f2fd;
+      border-color: #bbdefb;
+      color: #1976d2;
+    }
+    
+    .state-waiting_side_pose {
+      background: #e8f5e8;
+      border-color: #c8e6c9;
+      color: #388e3c;
+    }
+    
+    .state-analyzing_side_pose {
+      background: #fff3e0;
+      border-color: #ffcc02;
+      color: #f57c00;
+    }
+    
+    /* 진행률 바 */
+    .progress-container {
+      margin-top: 15px;
+      background: rgba(255,255,255,0.3);
+      border-radius: 10px;
+      padding: 10px;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4caf50, #8bc34a);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+    
+    /* 상태 아이콘 */
+    .state-icon {
+      font-size: 24px;
+      margin-right: 10px;
+    }
+    
+    /* 분석 결과 카드 */
+    .analysis-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 15px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      border-left: 4px solid #667eea;
+    }
+    
+    .analysis-item {
+      display: flex;
+      align-items: center;
+      margin: 8px 0;
+      padding: 8px;
+      border-radius: 6px;
+      background: #f8f9fa;
+    }
+    
+    .analysis-item.good {
+      background: #e8f5e8;
+      border-left: 3px solid #4caf50;
+    }
+    
+    .analysis-item.warning {
+      background: #fff3e0;
+      border-left: 3px solid #ff9800;
+    }
+    
+    .analysis-item.bad {
+      background: #ffebee;
+      border-left: 3px solid #f44336;
+    }
+    
+    .analysis-icon {
+      font-size: 20px;
+      margin-right: 12px;
+      width: 24px;
+      text-align: center;
+    }
+    
+    /* 반응형 디자인 */
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+        height: auto;
+      }
+      
+      .left, .right {
+        margin-bottom: 20px;
+      }
+      
+      .navbar-nav {
+        gap: 10px;
+      }
+      
+      .navbar-nav a {
+        padding: 6px 8px;
+        font-size: 12px;
+      }
     }
   </style>
 </head>
@@ -176,7 +322,22 @@
       <div class="video-container">
         <video id="webcam" autoplay muted playsinline></video>
         <div class="controls">
-          <button class="btn" onclick="toggleCamera()">카메라 ON/OFF</button>
+          <button class="btn" onclick="toggleCamera()">
+            <span id="camera-btn-text">카메라 시작</span>
+          </button>
+        </div>
+      </div>
+      
+      <!-- 상태 정보 표시 영역 -->
+      <div class="state-info" style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px; text-align: center;">
+        <h4 style="color: white; margin-bottom: 10px;">현재 상태</h4>
+        <div id="current-state" style="color: white; font-size: 16px; font-weight: bold;">
+          카메라를 시작해주세요
+        </div>
+        <div id="state-progress" class="progress-container" style="display: none;">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -185,7 +346,7 @@
       <div class="result-container">
         <div class="result-header">
           <h3>분석 결과</h3>
-          <p>안녕하세요, {{ user.username }}님!</p>
+          <p>안녕하세요, {{ user.username }}님! 단계별 자세 분석을 시작해보세요.</p>
         </div>
         
         <div class="overall-score" id="overall-score" style="display: none;">
@@ -193,7 +354,22 @@
           <div class="score-grade" id="score-grade">점수</div>
         </div>
         
-        <div id="result" class="status">분석 대기 중...</div>
+        <div id="result" class="status">
+          <div style="text-align: center; color: #666;">
+            <div style="font-size: 48px; margin-bottom: 15px;">📹</div>
+            <h4 style="margin-bottom: 10px;">자세 분석 준비</h4>
+            <p>카메라를 시작하고 단계별 안내에 따라 자세를 측정해보세요.</p>
+            <div style="margin-top: 20px; padding: 15px; background: #f0f0f0; border-radius: 8px;">
+              <h5 style="margin-bottom: 10px;">📋 분석 단계</h5>
+              <ol style="text-align: left; line-height: 1.8;">
+                <li>카메라 앞에 앉아주세요</li>
+                <li>정면을 바라보고 2초간 안정화</li>
+                <li>측면을 보여주세요</li>
+                <li>자세 분석 결과 확인</li>
+              </ol>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
