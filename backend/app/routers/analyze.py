@@ -39,10 +39,20 @@ async def analyze_body(
         HTTPException: 분석 실패 시
     """
     try:
+        print(f"체형 분석 요청 받음 - 사용자 ID: {analysis_request.user_id}")
+        print(f"전면 이미지 크기: {len(analysis_request.front_image)}")
+        print(f"측면 이미지 크기: {len(analysis_request.side_image)}")
+        print(f"분석 타입: {analysis_request.analysis_type}")
+        
         analyze_service = AnalyzeService(db)
         result = await analyze_service.analyze_body_posture(analysis_request, token)
+        
+        print(f"체형 분석 완료 - 전체 점수: {result.overall_score}")
         return result
     except Exception as e:
+        print(f"체형 분석 오류: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"체형 분석 중 오류가 발생했습니다: {str(e)}"

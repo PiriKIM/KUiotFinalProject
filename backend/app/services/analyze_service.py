@@ -21,22 +21,406 @@ class AnalyzeService:
         logger.info("AnalyzeService 초기화 완료")
     
     async def analyze_body_posture(self, request: BodyAnalysisRequest, token: str):
-        """기존 체형 분석 (단일 이미지)"""
-        # TODO: 실제 AI 분석 로직 구현
-        return BodyAnalysisResponse(
-            id=1,
-            user_id=request.user_id,
-            analysis_type=request.analysis_type,
-            image_path=None,
-            shoulder_angle=0.0,
-            spine_angle=0.0,
-            pelvis_angle=0.0,
-            neck_angle=0.0,
-            posture_score=85.0,
-            analysis_date=datetime.now(),
-            notes=None,
-            recommendations=[]
-        )
+        """체형 분석 (전면 + 측면 이미지)"""
+        try:
+            logger.info(f"체형 분석 시작 - 사용자 ID: {request.user_id}")
+            
+            # base64 이미지 디코딩
+            front_image = self._decode_base64_image(request.front_image)
+            side_image = self._decode_base64_image(request.side_image)
+            
+            if front_image is None or side_image is None:
+                raise ValueError("이미지 디코딩에 실패했습니다.")
+            
+            # 전면 이미지 분석
+            front_analysis = self._analyze_front_image(front_image)
+            
+            # 측면 이미지 분석
+            side_analysis = self._analyze_side_image(side_image)
+            
+            # 전체 점수 계산
+            overall_score = (front_analysis["posture_score"] + side_analysis["posture_score"]) / 2
+            
+            # 전체 피드백 생성
+            overall_feedback = self._generate_overall_feedback(front_analysis, side_analysis, overall_score)
+            
+            # 개선 제안 생성
+            improvement_suggestions = self._generate_improvement_suggestions(front_analysis, side_analysis)
+            
+            logger.info(f"체형 분석 완료 - 전체 점수: {overall_score}")
+            
+            return BodyAnalysisResponse(
+                front_analysis=front_analysis,
+                side_analysis=side_analysis,
+                overall_score=overall_score,
+                overall_feedback=overall_feedback,
+                improvement_suggestions=improvement_suggestions
+            )
+            
+        except Exception as e:
+            logger.error(f"체형 분석 오류: {str(e)}")
+            raise Exception(f"체형 분석 중 오류가 발생했습니다: {str(e)}")
+    
+    def _decode_base64_image(self, base64_string: str):
+        """base64 문자열을 OpenCV 이미지로 변환"""
+        try:
+            # data:image/jpeg;base64, 제거
+            if ',' in base64_string:
+                base64_string = base64_string.split(',')[1]
+            
+            image_bytes = base64.b64decode(base64_string)
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            return image
+        except Exception as e:
+            logger.error(f"이미지 디코딩 오류: {str(e)}")
+            return None
+    
+    def _analyze_front_image(self, image):
+        """전면 이미지 분석"""
+        try:
+            # MediaPipe Pose 초기화
+            mp_pose = mp.solutions.pose
+            pose = mp_pose.Pose(
+                static_image_mode=True,
+                model_complexity=2,
+                enable_segmentation=True,
+                min_detection_confidence=0.5
+            )
+            
+            # BGR을 RGB로 변환
+            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            results = pose.process(rgb_image)
+            
+            if not results.pose_landmarks:
+                return {
+                    "posture_score": 50.0,
+                    "angles": {},
+                    "recommendations": ["사람이 감지되지 않았습니다. 더 명확한 전면 사진을 촬영해주세요."],
+                    "feedback": "전면 사진에서 사람을 감지할 수 없습니다.",
+                    "landmarks": []
+                }
+            
+            # 랜드마크 추출
+            landmarks = []
+            for landmark in results.pose_landmarks.landmark:
+                landmarks.append((landmark.x, landmark.y))
+            
+            # 각도 계산
+            angles = self._calculate_front_angles(landmarks)
+            
+            # 자세 점수 계산
+            posture_score = self._calculate_front_posture_score(angles)
+            
+            # 피드백 생성
+            feedback = self._generate_front_feedback(angles, posture_score)
+            
+            # 권장사항 생성
+            recommendations = self._generate_front_recommendations(angles, posture_score)
+            
+            pose.close()
+            
+            return {
+                "posture_score": posture_score,
+                "angles": angles,
+                "recommendations": recommendations,
+                "feedback": feedback,
+                "landmarks": landmarks
+            }
+            
+        except Exception as e:
+            logger.error(f"전면 이미지 분석 오류: {str(e)}")
+            return {
+                "posture_score": 50.0,
+                "angles": {},
+                "recommendations": ["전면 이미지 분석 중 오류가 발생했습니다."],
+                "feedback": "전면 이미지 분석에 실패했습니다.",
+                "landmarks": []
+            }
+    
+    def _analyze_side_image(self, image):
+        """측면 이미지 분석"""
+        try:
+            # MediaPipe Pose 초기화
+            mp_pose = mp.solutions.pose
+            pose = mp_pose.Pose(
+                static_image_mode=True,
+                model_complexity=2,
+                enable_segmentation=True,
+                min_detection_confidence=0.5
+            )
+            
+            # BGR을 RGB로 변환
+            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            results = pose.process(rgb_image)
+            
+            if not results.pose_landmarks:
+                return {
+                    "posture_score": 50.0,
+                    "angles": {},
+                    "recommendations": ["사람이 감지되지 않았습니다. 더 명확한 측면 사진을 촬영해주세요."],
+                    "feedback": "측면 사진에서 사람을 감지할 수 없습니다.",
+                    "landmarks": []
+                }
+            
+            # 랜드마크 추출
+            landmarks = []
+            for landmark in results.pose_landmarks.landmark:
+                landmarks.append((landmark.x, landmark.y))
+            
+            # 각도 계산
+            angles = self._calculate_side_angles(landmarks)
+            
+            # 자세 점수 계산
+            posture_score = self._calculate_side_posture_score(angles)
+            
+            # 피드백 생성
+            feedback = self._generate_side_feedback(angles, posture_score)
+            
+            # 권장사항 생성
+            recommendations = self._generate_side_recommendations(angles, posture_score)
+            
+            pose.close()
+            
+            return {
+                "posture_score": posture_score,
+                "angles": angles,
+                "recommendations": recommendations,
+                "feedback": feedback,
+                "landmarks": landmarks
+            }
+            
+        except Exception as e:
+            logger.error(f"측면 이미지 분석 오류: {str(e)}")
+            return {
+                "posture_score": 50.0,
+                "angles": {},
+                "recommendations": ["측면 이미지 분석 중 오류가 발생했습니다."],
+                "feedback": "측면 이미지 분석에 실패했습니다.",
+                "landmarks": []
+            }
+    
+    def _calculate_front_angles(self, landmarks):
+        """전면 각도 계산"""
+        try:
+            # MediaPipe Pose 랜드마크 인덱스
+            LEFT_SHOULDER = 11
+            RIGHT_SHOULDER = 12
+            LEFT_HIP = 23
+            RIGHT_HIP = 24
+            
+            angles = {}
+            
+            # 어깨 각도 계산 (수평성)
+            if len(landmarks) > max(LEFT_SHOULDER, RIGHT_SHOULDER):
+                left_shoulder = landmarks[LEFT_SHOULDER]
+                right_shoulder = landmarks[RIGHT_SHOULDER]
+                
+                # 어깨 기울기 각도 계산
+                dx = right_shoulder[0] - left_shoulder[0]
+                dy = right_shoulder[1] - left_shoulder[1]
+                shoulder_angle = abs(np.degrees(np.arctan2(dy, dx)))
+                angles["shoulder_angle"] = shoulder_angle
+            
+            # 골반 각도 계산 (수평성)
+            if len(landmarks) > max(LEFT_HIP, RIGHT_HIP):
+                left_hip = landmarks[LEFT_HIP]
+                right_hip = landmarks[RIGHT_HIP]
+                
+                dx = right_hip[0] - left_hip[0]
+                dy = right_hip[1] - left_hip[1]
+                pelvis_angle = abs(np.degrees(np.arctan2(dy, dx)))
+                angles["pelvis_angle"] = pelvis_angle
+            
+            return angles
+            
+        except Exception as e:
+            logger.error(f"전면 각도 계산 오류: {str(e)}")
+            return {}
+    
+    def _calculate_side_angles(self, landmarks):
+        """측면 각도 계산"""
+        try:
+            # MediaPipe Pose 랜드마크 인덱스
+            NOSE = 0
+            EAR = 7
+            SHOULDER = 11
+            HIP = 23
+            KNEE = 25
+            ANKLE = 27
+            
+            angles = {}
+            
+            # 목 각도 계산
+            if len(landmarks) > max(NOSE, EAR, SHOULDER):
+                nose = landmarks[NOSE]
+                ear = landmarks[EAR]
+                shoulder = landmarks[SHOULDER]
+                
+                # 목 기울기 각도 계산
+                neck_angle = self._calculate_angle(nose, ear, shoulder)
+                angles["neck_angle"] = neck_angle
+            
+            # 척추 각도 계산
+            if len(landmarks) > max(SHOULDER, HIP):
+                shoulder = landmarks[SHOULDER]
+                hip = landmarks[HIP]
+                
+                # 척추 기울기 각도 계산
+                spine_angle = self._calculate_vertical_angle(shoulder, hip)
+                angles["spine_angle"] = spine_angle
+            
+            return angles
+            
+        except Exception as e:
+            logger.error(f"측면 각도 계산 오류: {str(e)}")
+            return {}
+    
+    def _calculate_angle(self, point1, point2, point3):
+        """세 점으로 이루어진 각도 계산"""
+        try:
+            v1 = np.array([point1[0] - point2[0], point1[1] - point2[1]])
+            v2 = np.array([point3[0] - point2[0], point3[1] - point2[1]])
+            
+            cos_angle = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+            angle = np.degrees(np.arccos(np.clip(cos_angle, -1.0, 1.0)))
+            return angle
+        except:
+            return 0.0
+    
+    def _calculate_vertical_angle(self, point1, point2):
+        """수직선과의 각도 계산"""
+        try:
+            dx = point2[0] - point1[0]
+            dy = point2[1] - point1[1]
+            angle = abs(np.degrees(np.arctan2(dx, dy)))
+            return angle
+        except:
+            return 0.0
+    
+    def _calculate_front_posture_score(self, angles):
+        """전면 자세 점수 계산"""
+        score = 100.0
+        
+        # 어깨 각도에 따른 점수 감점
+        if "shoulder_angle" in angles:
+            shoulder_angle = angles["shoulder_angle"]
+            if shoulder_angle > 10:
+                score -= min(20, (shoulder_angle - 10) * 2)
+        
+        # 골반 각도에 따른 점수 감점
+        if "pelvis_angle" in angles:
+            pelvis_angle = angles["pelvis_angle"]
+            if pelvis_angle > 10:
+                score -= min(20, (pelvis_angle - 10) * 2)
+        
+        return max(0, score)
+    
+    def _calculate_side_posture_score(self, angles):
+        """측면 자세 점수 계산"""
+        score = 100.0
+        
+        # 목 각도에 따른 점수 감점
+        if "neck_angle" in angles:
+            neck_angle = angles["neck_angle"]
+            if neck_angle > 15:
+                score -= min(30, (neck_angle - 15) * 2)
+        
+        # 척추 각도에 따른 점수 감점
+        if "spine_angle" in angles:
+            spine_angle = angles["spine_angle"]
+            if spine_angle > 10:
+                score -= min(30, (spine_angle - 10) * 3)
+        
+        return max(0, score)
+    
+    def _generate_front_feedback(self, angles, score):
+        """전면 피드백 생성"""
+        if score >= 90:
+            return "전면 자세가 매우 좋습니다!"
+        elif score >= 80:
+            return "전면 자세가 양호합니다."
+        elif score >= 70:
+            return "전면 자세에 약간의 개선이 필요합니다."
+        else:
+            return "전면 자세 개선이 필요합니다."
+    
+    def _generate_side_feedback(self, angles, score):
+        """측면 피드백 생성"""
+        if score >= 90:
+            return "측면 자세가 매우 좋습니다!"
+        elif score >= 80:
+            return "측면 자세가 양호합니다."
+        elif score >= 70:
+            return "측면 자세에 약간의 개선이 필요합니다."
+        else:
+            return "측면 자세 개선이 필요합니다."
+    
+    def _generate_front_recommendations(self, angles, score):
+        """전면 권장사항 생성"""
+        recommendations = []
+        
+        if "shoulder_angle" in angles and angles["shoulder_angle"] > 10:
+            recommendations.append("어깨를 수평하게 맞춰주세요.")
+        
+        if "pelvis_angle" in angles and angles["pelvis_angle"] > 10:
+            recommendations.append("골반을 수평하게 유지해주세요.")
+        
+        if not recommendations:
+            recommendations.append("현재 전면 자세를 유지해주세요.")
+        
+        return recommendations
+    
+    def _generate_side_recommendations(self, angles, score):
+        """측면 권장사항 생성"""
+        recommendations = []
+        
+        if "neck_angle" in angles and angles["neck_angle"] > 15:
+            recommendations.append("목을 똑바로 세워주세요.")
+        
+        if "spine_angle" in angles and angles["spine_angle"] > 10:
+            recommendations.append("척추를 곧게 펴주세요.")
+        
+        if not recommendations:
+            recommendations.append("현재 측면 자세를 유지해주세요.")
+        
+        return recommendations
+    
+    def _generate_overall_feedback(self, front_analysis, side_analysis, overall_score):
+        """전체 피드백 생성"""
+        if overall_score >= 90:
+            return "전반적으로 자세가 매우 좋습니다! 현재 자세를 유지해주세요."
+        elif overall_score >= 80:
+            return "전반적으로 자세가 양호합니다. 약간의 개선으로 더 좋은 자세를 만들 수 있습니다."
+        elif overall_score >= 70:
+            return "자세에 개선이 필요합니다. 권장사항을 참고하여 자세를 교정해주세요."
+        else:
+            return "자세 개선이 시급합니다. 전문가와 상담을 권장합니다."
+    
+    def _generate_improvement_suggestions(self, front_analysis, side_analysis):
+        """개선 제안 생성"""
+        suggestions = []
+        
+        # 전면 분석 기반 제안
+        front_angles = front_analysis.get("angles", {})
+        if front_angles.get("shoulder_angle", 0) > 10:
+            suggestions.append("어깨 스트레칭 운동을 정기적으로 수행하세요.")
+        
+        if front_angles.get("pelvis_angle", 0) > 10:
+            suggestions.append("골반 교정 운동을 통해 균형을 맞춰주세요.")
+        
+        # 측면 분석 기반 제안
+        side_angles = side_analysis.get("angles", {})
+        if side_angles.get("neck_angle", 0) > 15:
+            suggestions.append("목 스트레칭과 목 근육 강화 운동을 하세요.")
+        
+        if side_angles.get("spine_angle", 0) > 10:
+            suggestions.append("코어 운동을 통해 척추를 지지하는 근육을 강화하세요.")
+        
+        if not suggestions:
+            suggestions.append("현재 자세를 유지하면서 정기적인 운동을 계속하세요.")
+        
+        return suggestions
     
     def get_analysis_history(self, user_id: int, token: str):
         """분석 이력 조회"""

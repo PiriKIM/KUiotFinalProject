@@ -46,30 +46,30 @@ class UserResponse(BaseModel):
 # 체형 분석 관련 스키마
 class BodyAnalysisRequest(BaseModel):
     """체형 분석 요청 스키마"""
-    analysis_type: str = Field(..., pattern="^(front|side)$")  # front 또는 side
-    image_data: str  # base64 인코딩된 이미지 데이터
     user_id: int
+    front_image: str  # base64 인코딩된 전면 이미지 데이터
+    side_image: str   # base64 인코딩된 측면 이미지 데이터
+    analysis_type: str = Field(default="body_posture")
 
 class BodyAnalysisResponse(BaseModel):
     """체형 분석 응답 스키마"""
-    id: int
-    user_id: int
-    analysis_type: str
-    image_path: Optional[str]
-    
-    # 분석 결과
-    shoulder_angle: Optional[float]
-    spine_angle: Optional[float]
-    pelvis_angle: Optional[float]
-    neck_angle: Optional[float]
-    posture_score: float = Field(..., ge=0, le=100)
-    
-    # 메타데이터
-    analysis_date: datetime
-    notes: Optional[str]
-    
-    # 개선 권장사항
-    recommendations: List[str] = []
+    front_analysis: Dict[str, Any] = {
+        "posture_score": 0.0,
+        "angles": {},
+        "recommendations": [],
+        "feedback": "",
+        "landmarks": []
+    }
+    side_analysis: Dict[str, Any] = {
+        "posture_score": 0.0,
+        "angles": {},
+        "recommendations": [],
+        "feedback": "",
+        "landmarks": []
+    }
+    overall_score: float = Field(..., ge=0, le=100)
+    overall_feedback: str = ""
+    improvement_suggestions: List[str] = []
     
     class Config:
         from_attributes = True

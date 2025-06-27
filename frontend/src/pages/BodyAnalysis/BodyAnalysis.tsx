@@ -92,34 +92,55 @@ const BodyAnalysis: React.FC = () => {
     setError(null);
 
     try {
+      console.log('체형 분석 시작...');
+      
       // 이미지를 base64로 변환
       const frontBase64 = await fileToBase64(frontImage);
       const sideBase64 = await fileToBase64(sideImage);
+      
+      console.log('이미지 변환 완료');
+      console.log('전면 이미지 크기:', frontBase64.length);
+      console.log('측면 이미지 크기:', sideBase64.length);
+
+      // API 요청 데이터 준비
+      const requestData = {
+        user_id: user.id,
+        front_image: frontBase64,
+        side_image: sideBase64,
+        analysis_type: 'body_posture'
+      };
+      
+      console.log('API 요청 데이터 준비 완료');
+      console.log('사용자 ID:', user.id);
 
       // API 호출
+      console.log('API 호출 시작...');
       const response = await fetch('http://localhost:8000/analyze/body', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          user_id: user.id,
-          front_image: frontBase64,
-          side_image: sideBase64,
-          analysis_type: 'body_posture'
-        })
+        body: JSON.stringify(requestData)
       });
 
+      console.log('API 응답 받음');
+      console.log('응답 상태:', response.status);
+      console.log('응답 헤더:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
-        throw new Error('분석 중 오류가 발생했습니다.');
+        const errorText = await response.text();
+        console.error('API 오류 응답:', errorText);
+        throw new Error(`분석 중 오류가 발생했습니다. (${response.status}: ${errorText})`);
       }
 
       const result = await response.json();
+      console.log('분석 결과:', result);
+      
       setAnalysisResult(result);
     } catch (err) {
       console.error('체형 분석 오류:', err);
-      setError('체형 분석 중 오류가 발생했습니다.');
+      setError(`체형 분석 중 오류가 발생했습니다: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
     } finally {
       setIsAnalyzing(false);
     }
