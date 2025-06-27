@@ -60,14 +60,25 @@ class PostureAnalyzer:
 
     def calculate_neck_angle(self, landmarks):
         mp = self.mp_pose
-        left_ear = landmarks[mp.PoseLandmark.LEFT_EAR]
-        right_ear = landmarks[mp.PoseLandmark.RIGHT_EAR]
-        left_shoulder = landmarks[mp.PoseLandmark.LEFT_SHOULDER]
-        right_shoulder = landmarks[mp.PoseLandmark.RIGHT_SHOULDER]
-        ear_center = np.array([(left_ear.x + right_ear.x) / 2, (left_ear.y + right_ear.y) / 2])
-        shoulder_center = np.array([(left_shoulder.x + right_shoulder.x) / 2, (left_shoulder.y + right_shoulder.y) / 2])
-        vertical = np.array([shoulder_center[0], ear_center[1]])
-        return self.calculate_angle(ear_center, shoulder_center, vertical)
+        try:
+            if landmarks[mp.PoseLandmark.LEFT_EAR].visibility > 0.5 and landmarks[mp.PoseLandmark.LEFT_SHOULDER].visibility > 0.5:
+                ear = landmarks[mp.PoseLandmark.LEFT_EAR]
+                shoulder = landmarks[mp.PoseLandmark.LEFT_SHOULDER]
+            elif landmarks[mp.PoseLandmark.RIGHT_EAR].visibility > 0.5 and landmarks[mp.PoseLandmark.RIGHT_SHOULDER].visibility > 0.5:
+                ear = landmarks[mp.PoseLandmark.RIGHT_EAR]
+                shoulder = landmarks[mp.PoseLandmark.RIGHT_SHOULDER]
+            else:
+                left_ear = landmarks[mp.PoseLandmark.LEFT_EAR]
+                right_ear = landmarks[mp.PoseLandmark.RIGHT_EAR]
+                left_shoulder = landmarks[mp.PoseLandmark.LEFT_SHOULDER]
+                right_shoulder = landmarks[mp.PoseLandmark.RIGHT_SHOULDER]
+                ear = np.array([(left_ear.x + right_ear.x) / 2, (left_ear.y + right_ear.y) / 2])
+                shoulder = np.array([(left_shoulder.x + right_shoulder.x) / 2, (left_shoulder.y + right_shoulder.y) / 2])
+
+            vertical = np.array([shoulder.x, ear.y]) if hasattr(ear, 'x') else np.array([shoulder[0], ear[1]])
+            return self.calculate_angle(ear, shoulder, vertical)
+        except:
+            return None
 
     def grade_neck_posture(self, neck_angle):
         if neck_angle <= 5:
@@ -78,6 +89,32 @@ class PostureAnalyzer:
             return 'C', "보통 자세"
         else:
             return 'D', "나쁜 자세"
+    
+    def analyze_average_posture(self, landmark_batches):
+        """
+        30프레임 묶음 (landmark_batches: 리스트) → 평균 목각도와 등급 반환
+        """
+        valid_angles = []
+        for landmarks in landmark_batches:
+            angle = self.calculate_neck_angle(landmarks)
+            if angle is not None:
+                valid_angles.append(angle)
+
+        if not valid_angles:
+            return {
+                'avg_angle': None,
+                'grade': 'X',
+                'description': '유효한 프레임 없음'
+            }
+
+        avg_angle = sum(valid_angles) / len(valid_angles)
+        grade, desc = self.grade_neck_posture(avg_angle)
+        return {
+            'avg_angle': avg_angle,
+            'grade': grade,
+            'description': desc,
+            'frame_count': len(valid_angles)
+        }
 
     def analyze_turtle_neck_detailed(self, landmarks):
         mp = self.mp_pose

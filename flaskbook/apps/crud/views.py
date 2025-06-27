@@ -252,6 +252,51 @@ def analyze():
         else:
             return jsonify({'error': 'No person detected'})
 
+@crud.route('/analyze_batch', methods=['POST'])
+@login_required
+def analyze_batch():
+    data = request.get_json()
+    landmark_batches = data.get("landmark_batches", [])
+
+    if not landmark_batches:
+        return jsonify({"error": "No landmark data received"}), 400
+
+    try:
+        result = analyzer.analyze_average_posture(landmark_batches)
+
+        # ✅ 저장 로직 추가
+        user = User.query.get(session['user_id'])
+        record = PostureRecord(
+            user_id=user.id,
+            neck_angle=result['neck']['neck_angle'],
+            neck_grade=result['neck']['grade'],
+            neck_description=result['neck']['grade_description'],
+            spine_is_hunched=result['spine']['is_hunched'],
+            spine_angle=result['spine']['spine_angle'],
+            shoulder_is_asymmetric=result['shoulder']['is_asymmetric'],
+            shoulder_height_difference=result['shoulder']['height_difference'],
+            pelvic_is_tilted=result['pelvic']['is_tilted'],
+            pelvic_angle=result['pelvic']['pelvic_angle'],
+            spine_is_twisted=result['twist']['is_twisted'],
+            spine_alignment=result['twist']['spine_alignment'],
+        )
+        record.overall_score = record.calculate_overall_score()
+        record.overall_grade = record.calculate_overall_grade()
+        db.session.add(record)
+        db.session.commit()
+
+        return jsonify(result)
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
+
+@crud.route('/average')
+@login_required
+def average_page():
+    user = User.query.get(session['user_id'])
+    return render_template('crud/index_avg.html', user=user)
+
 @crud.route('/history')
 @login_required
 def history():
