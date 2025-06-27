@@ -1,3 +1,39 @@
+## [0.3.1] - 2025-06-27 00:30
+
+### ✨ Added
+- **실시간 스켈레톤 및 랜드마크 시각화 시스템**
+  - `flaskbook/apps/crud/views.py`에 상체 랜드마크 데이터 전송 기능 추가 (얼굴 제외, 귀부터 시작)
+  - `flaskbook/apps/crud/static/crud/script.js`에 실시간 스켈레톤 시각화 구현
+    - 라임색 스켈레톤 연결선 (어깨, 팔, 다리, 목)
+    - 빨간색 랜드마크 점들
+    - 중간점 계산 및 표시 (목, 어깨, 골반, 척추)
+    - 딥스카이블루 척추 중심선 (목-어깨-골반)
+    - FPS 측정 및 표시 기능
+- **Canvas 오버레이 시스템**
+  - `flaskbook/apps/crud/templates/crud/index.html`에 Canvas 오버레이 추가
+  - 비디오 위에 스켈레톤 오버레이 표시
+  - FPS 표시 요소 추가
+  - 실시간 시각적 피드백
+
+### 🎨 UI/UX Improvements
+- **실시간 스켈레톤 시각화**
+  - 색상별 중간점 표시:
+    - 🔵 파란색: 목 중심점
+    - 🟠 주황색: 어깨 중심점
+    - 🟣 보라색: 골반 중심점
+    - 🔵 청록색: 척추 중심점
+  - 딥스카이블루 척추 중심선 (목-어깨-골반)
+
+### 🔄 System Architecture
+- **실시간 시각화**: Canvas API + MediaPipe Pose 랜드마크
+
+### 📂 Modified Files
+- `flaskbook/apps/crud/views.py`: 랜드마크 데이터 전송 기능 추가
+- `flaskbook/apps/crud/static/crud/script.js`: 스켈레톤 시각화 시스템 추가
+- `flaskbook/apps/crud/templates/crud/index.html`: Canvas 오버레이 시스템 추가
+
+---
+
 ## [0.3.0] - 2025-06-26 23:00
 
 ### 🔧 Changed

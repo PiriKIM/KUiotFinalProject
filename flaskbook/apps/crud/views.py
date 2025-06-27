@@ -190,53 +190,53 @@ def analyze():
             
             # 분석 중일 때만 자세 분석 실행
             if state_manager.state == "analyzing_side_pose":
-                # 자세 분석 수행
-                neck_result = analyzer.analyze_turtle_neck_detailed(lm)
-                spine_result = analyzer.analyze_spine_curvature(lm)
-                shoulder_result = analyzer.analyze_shoulder_asymmetry(lm)
-                pelvic_result = analyzer.analyze_pelvic_tilt(lm)
-                twist_result = analyzer.analyze_spine_twisting(lm)
-                
-                # 데이터베이스에 분석 결과 저장
-                user = User.query.get(session['user_id'])
-                posture_record = PostureRecord(
-                    user_id=user.id,
-                    neck_angle=neck_result['neck_angle'],
-                    neck_grade=neck_result['grade'],
-                    neck_description=neck_result['grade_description'],
-                    spine_is_hunched=spine_result['is_hunched'],
-                    spine_angle=spine_result['spine_angle'],
-                    shoulder_is_asymmetric=shoulder_result['is_asymmetric'],
-                    shoulder_height_difference=shoulder_result['height_difference'],
-                    pelvic_is_tilted=pelvic_result['is_tilted'],
-                    pelvic_angle=pelvic_result['pelvic_angle'],
-                    spine_is_twisted=twist_result['is_twisted'],
-                    spine_alignment=twist_result['spine_alignment']
-                )
-                
-                # 종합 점수 계산
-                posture_record.overall_score = posture_record.calculate_overall_score()
-                posture_record.overall_grade = posture_record.calculate_overall_grade()
-                
-                try:
-                    db.session.add(posture_record)
-                    db.session.commit()
-                except Exception as e:
-                    db.session.rollback()
-                    print(f"데이터베이스 저장 오류: {e}")
-                
-                return jsonify({
+            # 자세 분석 수행
+            neck_result = analyzer.analyze_turtle_neck_detailed(lm)
+            spine_result = analyzer.analyze_spine_curvature(lm)
+            shoulder_result = analyzer.analyze_shoulder_asymmetry(lm)
+            pelvic_result = analyzer.analyze_pelvic_tilt(lm)
+            twist_result = analyzer.analyze_spine_twisting(lm)
+            
+            # 데이터베이스에 분석 결과 저장
+            user = User.query.get(session['user_id'])
+            posture_record = PostureRecord(
+                user_id=user.id,
+                neck_angle=neck_result['neck_angle'],
+                neck_grade=neck_result['grade'],
+                neck_description=neck_result['grade_description'],
+                spine_is_hunched=spine_result['is_hunched'],
+                spine_angle=spine_result['spine_angle'],
+                shoulder_is_asymmetric=shoulder_result['is_asymmetric'],
+                shoulder_height_difference=shoulder_result['height_difference'],
+                pelvic_is_tilted=pelvic_result['is_tilted'],
+                pelvic_angle=pelvic_result['pelvic_angle'],
+                spine_is_twisted=twist_result['is_twisted'],
+                spine_alignment=twist_result['spine_alignment']
+            )
+            
+            # 종합 점수 계산
+            posture_record.overall_score = posture_record.calculate_overall_score()
+            posture_record.overall_grade = posture_record.calculate_overall_grade()
+            
+            try:
+                db.session.add(posture_record)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                print(f"데이터베이스 저장 오류: {e}")
+            
+            return jsonify({
                     'landmarks': upper_body_landmarks,  # [AI 추가] 상체 랜드마크 반환
                     'state': state_manager.state,
                     'state_message': state_manager.get_state_message(),
-                    'neck': neck_result,
-                    'spine': spine_result,
-                    'shoulder': shoulder_result,
-                    'pelvic': pelvic_result,
-                    'twist': twist_result,
-                    'overall_score': posture_record.overall_score,
-                    'overall_grade': posture_record.overall_grade
-                })
+                'neck': neck_result,
+                'spine': spine_result,
+                'shoulder': shoulder_result,
+                'pelvic': pelvic_result,
+                'twist': twist_result,
+                'overall_score': posture_record.overall_score,
+                'overall_grade': posture_record.overall_grade
+            })
             else:
                 # 분석 중이 아닐 때는 상태 정보만 반환
                 stable_time = None

@@ -563,81 +563,81 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
 
             # 분석 중일 때만 자세 분석 실행
             if state_manager.state == "analyzing_side_pose":
-                # 자세 분석 실행
-                turtle_neck_result = posture_analyzer.analyze_turtle_neck(results.pose_landmarks.landmark)
-                spine_result = posture_analyzer.analyze_spine_curvature(results.pose_landmarks.landmark)
-                shoulder_result = posture_analyzer.analyze_shoulder_asymmetry(results.pose_landmarks.landmark)
-                pelvic_result = posture_analyzer.analyze_pelvic_tilt(results.pose_landmarks.landmark)
-                spine_twisting_result = posture_analyzer.analyze_spine_twisting(results.pose_landmarks.landmark)
+            # 자세 분석 실행
+            turtle_neck_result = posture_analyzer.analyze_turtle_neck(results.pose_landmarks.landmark)
+            spine_result = posture_analyzer.analyze_spine_curvature(results.pose_landmarks.landmark)
+            shoulder_result = posture_analyzer.analyze_shoulder_asymmetry(results.pose_landmarks.landmark)
+            pelvic_result = posture_analyzer.analyze_pelvic_tilt(results.pose_landmarks.landmark)
+            spine_twisting_result = posture_analyzer.analyze_spine_twisting(results.pose_landmarks.landmark)
 
-                # 분석 결과를 화면에 표시
+            # 분석 결과를 화면에 표시
                 y_offset = 90
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.6
-                thickness = 2
-                
-                # 거북목 상태
-                color = (0, 0, 255) if turtle_neck_result['is_turtle_neck'] else (0, 255, 0)
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.6
+            thickness = 2
+            
+            # 거북목 상태
+            color = (0, 0, 255) if turtle_neck_result['is_turtle_neck'] else (0, 255, 0)
                 status_text = f"거북목: {'감지됨' if turtle_neck_result['is_turtle_neck'] else '정상'}"
                 image = put_korean_text(image, status_text, (10, y_offset), 16, color)
                 y_offset += 30
-                
-                # 척추 굴곡 상태
-                y_offset += 30
-                color = (0, 0, 255) if spine_result['is_hunched'] else (0, 255, 0)
+            
+            # 척추 굴곡 상태
+            y_offset += 30
+            color = (0, 0, 255) if spine_result['is_hunched'] else (0, 255, 0)
                 status_text = f"척추 굴곡: {'감지됨' if spine_result['is_hunched'] else '정상'}"
                 image = put_korean_text(image, status_text, (10, y_offset), 16, color)
-                
-                # 어깨 비대칭 상태
-                y_offset += 30
-                color = (0, 0, 255) if shoulder_result['is_asymmetric'] else (0, 255, 0)
+            
+            # 어깨 비대칭 상태
+            y_offset += 30
+            color = (0, 0, 255) if shoulder_result['is_asymmetric'] else (0, 255, 0)
                 status_text = f"어깨 비대칭: {'감지됨' if shoulder_result['is_asymmetric'] else '정상'}"
                 image = put_korean_text(image, status_text, (10, y_offset), 16, color)
-                
-                # 골반 기울어짐 상태
-                y_offset += 30
-                color = (0, 0, 255) if pelvic_result['is_tilted'] else (0, 255, 0)
+            
+            # 골반 기울어짐 상태
+            y_offset += 30
+            color = (0, 0, 255) if pelvic_result['is_tilted'] else (0, 255, 0)
                 status_text = f"골반 기울어짐: {'감지됨' if pelvic_result['is_tilted'] else '정상'}"
                 image = put_korean_text(image, status_text, (10, y_offset), 16, color)
-                
-                # 척추 틀어짐 상태
-                y_offset += 30
-                color = (0, 0, 255) if spine_twisting_result['is_twisted'] else (0, 255, 0)
+            
+            # 척추 틀어짐 상태
+            y_offset += 30
+            color = (0, 0, 255) if spine_twisting_result['is_twisted'] else (0, 255, 0)
                 status_text = f"척추 틀어짐: {'감지됨' if spine_twisting_result['is_twisted'] else '정상'}"
                 image = put_korean_text(image, status_text, (10, y_offset), 16, color)
 
-                # 분석선 그리기
-                h, w, _ = image.shape  # 축소된 화면 크기 사용
-                
-                # 거북목 분석선 (목-어깨 수직선) - 좌우반전 고려
-                head_x = int((1 - turtle_neck_result['neck_top'][0]) * w)
-                head_y = int(turtle_neck_result['neck_top'][1] * h)
-                shoulder_x = int((1 - turtle_neck_result['shoulder_center'][0]) * w)
-                shoulder_y = int(turtle_neck_result['shoulder_center'][1] * h)
-                
-                cv2.line(image, (head_x, head_y), (shoulder_x, shoulder_y), (255, 0, 0), 2)
-                
-                # 척추 분석선 (어깨-골반) - 좌우반전 고려
-                spine_shoulder_x = int((1 - spine_result['shoulder_center'][0]) * w)
-                spine_shoulder_y = int(spine_result['shoulder_center'][1] * h)
-                spine_hip_x = int((1 - spine_result['hip_center'][0]) * w)
-                spine_hip_y = int(spine_result['hip_center'][1] * h)
-                
-                cv2.line(image, (spine_shoulder_x, spine_shoulder_y), (spine_hip_x, spine_hip_y), (0, 255, 255), 2)
-                
-                # 골반 중앙점 표시 - 좌우반전 고려
-                pelvic_x = int((1 - pelvic_result['pelvic_center'][0]) * w)
-                pelvic_y = int(pelvic_result['pelvic_center'][1] * h)
-                cv2.circle(image, (pelvic_x, pelvic_y), 5, (255, 255, 0), -1)
+            # 분석선 그리기
+            h, w, _ = image.shape  # 축소된 화면 크기 사용
+            
+            # 거북목 분석선 (목-어깨 수직선) - 좌우반전 고려
+            head_x = int((1 - turtle_neck_result['neck_top'][0]) * w)
+            head_y = int(turtle_neck_result['neck_top'][1] * h)
+            shoulder_x = int((1 - turtle_neck_result['shoulder_center'][0]) * w)
+            shoulder_y = int(turtle_neck_result['shoulder_center'][1] * h)
+            
+            cv2.line(image, (head_x, head_y), (shoulder_x, shoulder_y), (255, 0, 0), 2)
+            
+            # 척추 분석선 (어깨-골반) - 좌우반전 고려
+            spine_shoulder_x = int((1 - spine_result['shoulder_center'][0]) * w)
+            spine_shoulder_y = int(spine_result['shoulder_center'][1] * h)
+            spine_hip_x = int((1 - spine_result['hip_center'][0]) * w)
+            spine_hip_y = int(spine_result['hip_center'][1] * h)
+            
+            cv2.line(image, (spine_shoulder_x, spine_shoulder_y), (spine_hip_x, spine_hip_y), (0, 255, 255), 2)
+            
+            # 골반 중앙점 표시 - 좌우반전 고려
+            pelvic_x = int((1 - pelvic_result['pelvic_center'][0]) * w)
+            pelvic_y = int(pelvic_result['pelvic_center'][1] * h)
+            cv2.circle(image, (pelvic_x, pelvic_y), 5, (255, 255, 0), -1)
 
-                # 콘솔에 상세 정보 출력
-                print(f"=== 자세 분석 결과 ===")
-                print(f"거북목: {turtle_neck_result['is_turtle_neck']} (이탈도: {turtle_neck_result['deviation_top']:.3f}, {turtle_neck_result['deviation_mid']:.3f})")
-                print(f"척추 굴곡: {spine_result['is_hunched']} (각도: {spine_result['spine_angle']:.1f}도)")
-                print(f"어깨 비대칭: {shoulder_result['is_asymmetric']} (차이: {shoulder_result['height_difference']:.3f})")
-                print(f"골반 기울어짐: {pelvic_result['is_tilted']} (차이: {pelvic_result['height_difference']:.3f})")
-                print(f"척추 틀어짐: {spine_twisting_result['is_twisted']} (차이: {spine_twisting_result['spine_alignment']:.3f})")
-                print("=" * 30)
+            # 콘솔에 상세 정보 출력
+            print(f"=== 자세 분석 결과 ===")
+            print(f"거북목: {turtle_neck_result['is_turtle_neck']} (이탈도: {turtle_neck_result['deviation_top']:.3f}, {turtle_neck_result['deviation_mid']:.3f})")
+            print(f"척추 굴곡: {spine_result['is_hunched']} (각도: {spine_result['spine_angle']:.1f}도)")
+            print(f"어깨 비대칭: {shoulder_result['is_asymmetric']} (차이: {shoulder_result['height_difference']:.3f})")
+            print(f"골반 기울어짐: {pelvic_result['is_tilted']} (차이: {pelvic_result['height_difference']:.3f})")
+            print(f"척추 틀어짐: {spine_twisting_result['is_twisted']} (차이: {spine_twisting_result['spine_alignment']:.3f})")
+            print("=" * 30)
 
         # 화면에 출력
         cv2.imshow('Side Pose Analysis', image)

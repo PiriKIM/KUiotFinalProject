@@ -333,13 +333,13 @@ document.addEventListener("DOMContentLoaded", () => {
             
             // 분석 중일 때만 결과 표시
             if (data.state === "analyzing_side_pose" && data.overall_score !== undefined) {
-              // 종합 점수 표시
-              scoreNumber.textContent = data.overall_score;
-              scoreGrade.textContent = `등급: ${data.overall_grade}`;
-              overallScore.style.display = "block";
-              
-              // 상세 분석 결과 표시
-              resultBox.innerHTML = `
+            // 종합 점수 표시
+            scoreNumber.textContent = data.overall_score;
+            scoreGrade.textContent = `등급: ${data.overall_grade}`;
+            overallScore.style.display = "block";
+            
+            // 상세 분석 결과 표시
+            resultBox.innerHTML = `
                 <div style="text-align: center; padding: 20px;">
                   <h3 style="color: #96ceb4; margin-bottom: 15px;">자세 분석 완료!</h3>
                   <div style="background: rgba(150, 206, 180, 0.1); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
@@ -357,11 +357,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     분석 시간: ${new Date().toLocaleString()}
                   </div>
                 </div>
-              `.trim();
+            `.trim();
               
               resultBox.style.backgroundColor = "#1b2d1b";
               resultBox.style.border = "2px solid #96ceb4";
-              resultBox.className = "success";
+            resultBox.className = "success";
             }
           }
         })
