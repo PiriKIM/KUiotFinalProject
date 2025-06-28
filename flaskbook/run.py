@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Flask 애플리케이션 실행 스크립트
-사용법: python run.py
+사용법: python3 run.py
 """
 
 from apps.app import create_app

@@ -209,31 +209,54 @@ class PoseStateManager:
             return "바른자세 측정을 시작합니다. 학습을 시작하세요."
         return "알 수 없는 상태"
 
-# 자세 분석 클래스
+# 개선된 자세 분석 클래스 (neck.py 로직 반영)
 class PostureAnalyzer:
     def __init__(self):
         self.mp_pose = mp.solutions.pose
          
     def calculate_angle(self, a, b, c):
-        """세 점으로 각도 계산"""
-        a = np.array([a.x, a.y])
-        b = np.array([b.x, b.y])
-        c = np.array([c.x, c.y])
-        
-        radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
-        angle = np.abs(radians * 180.0 / np.pi)
-        
-        if angle > 180.0:
-            angle = 360 - angle
-            
-        return angle
+        """세 점으로 각도 계산 (neck.py 방식)"""
+        a_pt = np.array([a.x, a.y]) if not isinstance(a, np.ndarray) else a
+        b_pt = np.array([b.x, b.y]) if not isinstance(b, np.ndarray) else b
+        c_pt = np.array([c.x, c.y]) if not isinstance(c, np.ndarray) else c
+
+        ba = a_pt - b_pt
+        bc = c_pt - b_pt
+
+        cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+        angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
+        return np.degrees(angle)
     
     def calculate_distance(self, point1, point2):
         """두 점 간의 거리 계산"""
         return math.sqrt((point1.x - point2.x)**2 + (point1.y - point2.y)**2)
     
+    def calculate_neck_angle(self, landmarks):
+        """목 각도 계산 (neck.py 방식)"""
+        left_ear = landmarks[self.mp_pose.PoseLandmark.LEFT_EAR]
+        right_ear = landmarks[self.mp_pose.PoseLandmark.RIGHT_EAR]
+        left_shoulder = landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER]
+        right_shoulder = landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER]
+        
+        ear_center = np.array([(left_ear.x + right_ear.x) / 2, (left_ear.y + right_ear.y) / 2])
+        shoulder_center = np.array([(left_shoulder.x + right_shoulder.x) / 2, (left_shoulder.y + right_shoulder.y) / 2])
+        vertical = np.array([shoulder_center[0], ear_center[1]])
+        
+        return self.calculate_angle(ear_center, shoulder_center, vertical)
+
+    def grade_neck_posture(self, neck_angle):
+        """목 자세 등급 평가 (neck.py 방식)"""
+        if neck_angle <= 5:
+            return 'A', "완벽한 자세"
+        elif neck_angle <= 10:
+            return 'B', "양호한 자세"
+        elif neck_angle <= 15:
+            return 'C', "보통 자세"
+        else:
+            return 'D', "나쁜 자세"
+    
     def analyze_turtle_neck(self, landmarks):
-        """거북목 분석 - 목-어깨의 수직선 이탈 확인 (더 세밀한 분석)"""
+        """거북목 분석 - 목-어깨의 수직선 이탈 확인 (neck.py 방식)"""
         left_shoulder = landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER]
         right_shoulder = landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER]
         left_ear = landmarks[self.mp_pose.PoseLandmark.LEFT_EAR]
@@ -266,9 +289,33 @@ class PostureAnalyzer:
             'neck_mid': (neck_mid_x, neck_mid_y),
             'shoulder_center': (shoulder_center_x, shoulder_center_y)
         }
+
+    def analyze_turtle_neck_detailed(self, landmarks):
+        """거북목 상세 분석 (neck.py 방식)"""
+        neck_angle = self.calculate_neck_angle(landmarks)
+        grade, desc = self.grade_neck_posture(neck_angle)
+        
+        neck_top = (
+            (landmarks[self.mp_pose.PoseLandmark.LEFT_EAR].x + landmarks[self.mp_pose.PoseLandmark.RIGHT_EAR].x) / 2,
+            (landmarks[self.mp_pose.PoseLandmark.LEFT_EAR].y + landmarks[self.mp_pose.PoseLandmark.RIGHT_EAR].y) / 2
+        )
+        shoulder_center = (
+            (landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER].x + landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER].x) / 2,
+            (landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER].y + landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER].y) / 2
+        )
+        vertical_deviation = abs(neck_top[0] - shoulder_center[0])
+        
+        return {
+            'neck_angle': neck_angle,
+            'grade': grade,
+            'grade_description': desc,
+            'vertical_deviation': vertical_deviation,
+            'neck_top': neck_top,
+            'shoulder_center': shoulder_center
+        }
     
     def analyze_spine_curvature(self, landmarks):
-        """척추 굴곡 분석 - 등이 굽은 상태 확인 (더 세밀한 분석)"""
+        """척추 굴곡 분석 - 등이 굽은 상태 확인 (neck.py 방식)"""
         left_shoulder = landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER]
         right_shoulder = landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER]
         left_hip = landmarks[self.mp_pose.PoseLandmark.LEFT_HIP]
@@ -302,7 +349,7 @@ class PostureAnalyzer:
         }
     
     def analyze_shoulder_asymmetry(self, landmarks):
-        """어깨선 분석 - 어깨의 기울기와 비대칭 확인 (더 세밀한 분석)"""
+        """어깨선 분석 - 어깨의 기울기와 비대칭 확인 (neck.py 방식)"""
         left_shoulder = landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER]
         right_shoulder = landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER]
         left_elbow = landmarks[self.mp_pose.PoseLandmark.LEFT_ELBOW]
@@ -339,7 +386,7 @@ class PostureAnalyzer:
         }
     
     def analyze_pelvic_tilt(self, landmarks):
-        """골반 관절 분석 - 골반의 기울기와 비대칭 확인 (더 세밀한 분석)"""
+        """골반 관절 분석 - 골반의 기울기와 비대칭 확인 (neck.py 방식)"""
         left_hip = landmarks[self.mp_pose.PoseLandmark.LEFT_HIP]
         right_hip = landmarks[self.mp_pose.PoseLandmark.RIGHT_HIP]
         left_knee = landmarks[self.mp_pose.PoseLandmark.LEFT_KNEE]
@@ -384,7 +431,7 @@ class PostureAnalyzer:
         }
     
     def analyze_spine_twisting(self, landmarks):
-        """척추 틀어짐 분석 - 측면에서 본 척추 곡률 확인"""
+        """척추 틀어짐 분석 - 측면에서 본 척추 곡률 확인 (neck.py 방식)"""
         left_shoulder = landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER]
         right_shoulder = landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER]
         left_hip = landmarks[self.mp_pose.PoseLandmark.LEFT_HIP]
@@ -563,8 +610,8 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
 
             # 분석 중일 때만 자세 분석 실행
             if state_manager.state == "analyzing_side_pose":
-                # 자세 분석 실행
-                turtle_neck_result = posture_analyzer.analyze_turtle_neck(results.pose_landmarks.landmark)
+                # 개선된 자세 분석 실행 (neck.py 방식)
+                turtle_neck_result = posture_analyzer.analyze_turtle_neck_detailed(results.pose_landmarks.landmark)
                 spine_result = posture_analyzer.analyze_spine_curvature(results.pose_landmarks.landmark)
                 shoulder_result = posture_analyzer.analyze_shoulder_asymmetry(results.pose_landmarks.landmark)
                 pelvic_result = posture_analyzer.analyze_pelvic_tilt(results.pose_landmarks.landmark)
@@ -572,15 +619,22 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
 
                 # 분석 결과를 화면에 표시 (우측 상단으로 이동)
                 h, w, _ = image.shape  # 화면 크기 가져오기
-                x_start = w - 300  # 우측에서 300픽셀 떨어진 위치
+                x_start = w - 350  # 우측에서 350픽셀 떨어진 위치
                 y_offset = 30  # 상단에서 시작
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.6
-                thickness = 2
+                
+                # 목 각도 및 등급 (새로운 기능)
+                color = (0, 255, 0) if turtle_neck_result['grade'] in ['A', 'B'] else (0, 0, 255)
+                neck_text = f"목 각도: {turtle_neck_result['neck_angle']:.1f}° ({turtle_neck_result['grade']})"
+                image = put_korean_text(image, neck_text, (x_start, y_offset), 16, color)
+                y_offset += 25
+                
+                grade_text = f"등급: {turtle_neck_result['grade_description']}"
+                image = put_korean_text(image, grade_text, (x_start, y_offset), 14, color)
+                y_offset += 30
                 
                 # 거북목 상태
-                color = (0, 0, 255) if turtle_neck_result['is_turtle_neck'] else (0, 255, 0)
-                status_text = f"거북목: {'감지됨' if turtle_neck_result['is_turtle_neck'] else '정상'}"
+                color = (0, 0, 255) if turtle_neck_result['vertical_deviation'] > 0.03 else (0, 255, 0)
+                status_text = f"거북목: {'감지됨' if turtle_neck_result['vertical_deviation'] > 0.03 else '정상'}"
                 image = put_korean_text(image, status_text, (x_start, y_offset), 16, color)
                 y_offset += 30
                 
@@ -630,20 +684,21 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
                 pelvic_y = int(pelvic_result['pelvic_center'][1] * h)
                 cv2.circle(image, (pelvic_x, pelvic_y), 5, (255, 255, 0), -1)
 
-                # 콘솔에 상세 정보 출력
-                print(f"=== 자세 분석 결과 ===")
-                print(f"거북목: {turtle_neck_result['is_turtle_neck']} (이탈도: {turtle_neck_result['deviation_top']:.3f}, {turtle_neck_result['deviation_mid']:.3f})")
+                # 콘솔에 상세 정보 출력 (개선된 정보)
+                print(f"=== 개선된 자세 분석 결과 ===")
+                print(f"목 각도: {turtle_neck_result['neck_angle']:.1f}° (등급: {turtle_neck_result['grade']} - {turtle_neck_result['grade_description']})")
+                print(f"거북목: {turtle_neck_result['vertical_deviation'] > 0.03} (수직 이탈도: {turtle_neck_result['vertical_deviation']:.3f})")
                 print(f"척추 굴곡: {spine_result['is_hunched']} (각도: {spine_result['spine_angle']:.1f}도)")
-                print(f"어깨 비대칭: {shoulder_result['is_asymmetric']} (차이: {shoulder_result['height_difference']:.3f})")
-                print(f"골반 기울어짐: {pelvic_result['is_tilted']} (차이: {pelvic_result['height_difference']:.3f})")
-                print(f"척추 틀어짐: {spine_twisting_result['is_twisted']} (차이: {spine_twisting_result['spine_alignment']:.3f})")
-                print("=" * 30)
+                print(f"어깨 비대칭: {shoulder_result['is_asymmetric']} (차이: {shoulder_result['height_difference']:.3f}, 높은 쪽: {shoulder_result['higher_shoulder']})")
+                print(f"골반 기울어짐: {pelvic_result['is_tilted']} (차이: {pelvic_result['height_difference']:.3f}, 높은 쪽: {pelvic_result['higher_hip']})")
+                print(f"척추 틀어짐: {spine_twisting_result['is_twisted']} (정렬도: {spine_twisting_result['spine_alignment']:.3f})")
+                print("=" * 40)
 
         # 화면에 출력
-        cv2.imshow('Side Pose Analysis', image)
+        cv2.imshow('Side Pose Analysis v2 (Improved)', image)
 
         if cv2.waitKey(5) & 0xFF == 27:  # ESC 키 종료
             break
 
 cap.release()
-cv2.destroyAllWindows()
+cv2.destroyAllWindows() 
