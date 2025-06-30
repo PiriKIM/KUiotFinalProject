@@ -21,27 +21,15 @@ class PoseGradeModelTrainer:
         self.feature_names = []
         
     def load_data(self):
-        """데이터베이스에서 데이터 로드"""
-        conn = sqlite3.connect(self.db_path)
-        
-        # 기본 특성 데이터 로드 (모든 등급 포함)
-        query = '''
-            SELECT participant_id, view_angle, pose_grade, neck_angle, spine_angle, 
-                   shoulder_asymmetry, pelvic_tilt, analysis_results
-            FROM pose_grade_data
-            WHERE analysis_results IS NOT NULL
-        '''
-        
-        df = pd.read_sql_query(query, conn)
-        conn.close()
-        
+        """CSV에서 데이터 로드"""
+        csv_path = "/home/yj/KUiotFinalProject/test_grade/collector/db/merge/merged.csv"
+        df = pd.read_csv(csv_path)
         print(f"로드된 데이터: {len(df)}개 샘플")
         print(f"시점별 분포:")
         view_counts = df['view_angle'].value_counts()
         for view, count in view_counts.items():
             view_name = "정면" if view == "1" else "측면"
             print(f"  {view_name}: {count}개")
-        
         print(f"등급별 분포:")
         grade_counts = df['pose_grade'].value_counts()
         grade_names = {
@@ -53,7 +41,6 @@ class PoseGradeModelTrainer:
         }
         for grade, count in grade_counts.items():
             print(f"  {grade_names.get(grade, grade)}: {count}개")
-        
         return df
         
     def extract_features(self, df):
