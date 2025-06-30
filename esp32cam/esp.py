@@ -60,7 +60,8 @@ while cap.isOpened():
     results = pose.process(rgb)
 
     # 결과 저장
-    save_openpose_json(results, frame_count)
+    if frame_count % 20 == 0:
+        save_openpose_json(results, frame_count)
 
     # 화면 표시용
     if results.pose_landmarks:
