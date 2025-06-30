@@ -1,6 +1,3 @@
-# test_grade 디렉토리 제외
-test_grade/
-
 # Python
 __pycache__/
 *.py[cod]
