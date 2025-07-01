@@ -60,7 +60,7 @@ def get_korean_font(font_size=20):
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/System/Library/Fonts/Arial.ttf",  # macOS
         "C:/Windows/Fonts/malgun.ttf",      # Windows
-        "/home/woo/kuBig2025/opencv/data/NanumPenScript-Regular.ttf"  # 사용자 지정 경로
+        "/home/yj/kuuniv.bigdata2025/opencv/data/NanumPenScript-Regular.ttf"  # 사용자 지정 경로
     ]
     
     for font_path in font_paths:
