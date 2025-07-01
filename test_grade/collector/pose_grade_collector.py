@@ -100,47 +100,54 @@ class PoseGradeCollector:
         # 프레임 카운터 추가
         self.frame_count = 0
         
-        # 데이터 저장을 위한 큐와 스레드
-        self.save_queue = queue.Queue()
+        # 데이터 저장을 위한 큐와 스레드 (큐 크기 제한 추가)
+        self.save_queue = queue.Queue(maxsize=1000)  # 최대 1000개 대기
         self.save_thread = None
         self.save_thread_running = True
+        self.save_success_count = 0
+        self.save_fail_count = 0
         
     def init_database(self):
         """데이터베이스 초기화 - 66개 개별 컬럼으로 변경"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        # 기존 테이블 삭제 (스키마 변경을 위해)
-        cursor.execute("DROP TABLE IF EXISTS pose_grade_data")
-        
-        # 33개 랜드마크의 x, y 좌표를 개별 컬럼으로 생성
-        landmark_columns = []
-        for i in range(33):
-            landmark_columns.extend([f'landmark_{i}_x REAL', f'landmark_{i}_y REAL'])
-        
-        landmark_columns_str = ', '.join(landmark_columns)
-        
-        cursor.execute(f'''
-            CREATE TABLE IF NOT EXISTS pose_grade_data (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                participant_id TEXT,
-                view_angle TEXT,
-                pose_grade TEXT,
-                auto_grade TEXT,
-                neck_angle REAL,
-                spine_angle REAL,
-                shoulder_asymmetry REAL,
-                pelvic_tilt REAL,
-                total_score REAL,
-                analysis_results TEXT,
-                {landmark_columns_str}
-            )
-        ''')
-        
-        conn.commit()
-        conn.close()
-        print("데이터베이스 초기화 완료 - 새로운 스키마로 재생성됨")
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # 기존 테이블 삭제 (스키마 변경을 위해)
+            cursor.execute("DROP TABLE IF EXISTS pose_grade_data")
+            
+            # 33개 랜드마크의 x, y 좌표를 개별 컬럼으로 생성
+            landmark_columns = []
+            for i in range(33):
+                landmark_columns.extend([f'landmark_{i}_x REAL', f'landmark_{i}_y REAL'])
+            
+            landmark_columns_str = ', '.join(landmark_columns)
+            
+            cursor.execute(f'''
+                CREATE TABLE IF NOT EXISTS pose_grade_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT,
+                    participant_id TEXT,
+                    view_angle TEXT,
+                    pose_grade TEXT,
+                    auto_grade TEXT,
+                    neck_angle REAL,
+                    spine_angle REAL,
+                    shoulder_asymmetry REAL,
+                    pelvic_tilt REAL,
+                    total_score REAL,
+                    analysis_results TEXT,
+                    {landmark_columns_str}
+                )
+            ''')
+            
+            conn.commit()
+            conn.close()
+            print("데이터베이스 초기화 완료 - 새로운 스키마로 재생성됨")
+            
+        except Exception as e:
+            print(f"데이터베이스 초기화 실패: {e}")
+            raise
         
     def start_save_thread(self):
         """데이터 저장 스레드 시작"""
@@ -155,6 +162,7 @@ class PoseGradeCollector:
         if self.save_thread:
             self.save_thread.join(timeout=2)
         print("데이터 저장 스레드 종료됨")
+        print(f"저장 통계: 성공 {self.save_success_count}개, 실패 {self.save_fail_count}개")
         
     def save_worker(self):
         """데이터 저장 워커 스레드"""
@@ -166,26 +174,43 @@ class PoseGradeCollector:
                     break
                     
                 # 데이터베이스에 저장
-                self._save_to_database(data)
+                success = self._save_to_database(data)
+                if success:
+                    self.save_success_count += 1
+                else:
+                    self.save_fail_count += 1
+                    
                 self.save_queue.task_done()
                 
             except queue.Empty:
                 continue
             except Exception as e:
-                print(f"데이터 저장 오류: {e}")
+                print(f"데이터 저장 워커 오류: {e}")
+                self.save_fail_count += 1
                 
     def _save_to_database(self, data):
         """실제 데이터베이스 저장 작업"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
         try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
             cursor.execute(data['query'], data['values'])
             conn.commit()
+            conn.close()
+            return True
+            
+        except sqlite3.Error as e:
+            print(f"SQLite 오류: {e}")
+            return False
         except Exception as e:
             print(f"데이터베이스 저장 실패: {e}")
+            return False
         finally:
-            conn.close()
+            try:
+                if 'conn' in locals():
+                    conn.close()
+            except:
+                pass
         
     def keyboard_input_handler(self):
         """키보드 입력 처리 스레드"""
@@ -324,7 +349,15 @@ class PoseGradeCollector:
         self.stop_save_thread()
         
         # 남은 데이터 저장 완료 대기
-        self.save_queue.join()
+        try:
+            # 큐가 비워질 때까지 대기 (최대 5초)
+            start_wait = time.time()
+            while not self.save_queue.empty() and (time.time() - start_wait) < 5:
+                time.sleep(0.1)
+            if not self.save_queue.empty():
+                print("저장 큐 대기 시간 초과")
+        except:
+            print("저장 큐 대기 중 오류 발생")
         
         print(f"데이터 수집 완료! 총 {frame_count}개 프레임 수집")
         
@@ -352,104 +385,118 @@ class PoseGradeCollector:
         
     def save_data_async(self, participant_id, landmarks, analysis, auto_grade=None, total_score=None):
         """비동기 데이터 저장 - 큐에 저장 작업 추가"""
-        # 33개 랜드마크를 66개 개별 컬럼으로 변환 (visibility 필터링 적용)
-        landmark_values = []
-        for i, landmark in enumerate(landmarks):
-            # visibility < 0.5인 경우 -1로 저장
-            if hasattr(landmark, 'visibility') and landmark.visibility < 0.5:
-                landmark_values.extend([-1, -1])  # x, y 모두 -1
-            else:
-                landmark_values.extend([landmark.x, landmark.y])
-        
-        # 66개 랜드마크 컬럼명 생성
-        landmark_columns = []
-        for i in range(33):
-            landmark_columns.extend([f'landmark_{i}_x', f'landmark_{i}_y'])
-        
-        # SQL 쿼리 생성
-        columns = ['timestamp', 'participant_id', 'view_angle', 'pose_grade', 'auto_grade',
-                  'neck_angle', 'spine_angle', 'shoulder_asymmetry', 'pelvic_tilt', 
-                  'total_score', 'analysis_results'] + landmark_columns
-        
-        placeholders = ['?'] * len(columns)
-        
-        values = [
-            datetime.now().isoformat(),
-            participant_id,
-            self.current_view,
-            self.current_pose,
-            auto_grade,
-            analysis['neck']['neck_angle'],
-            analysis['spine']['spine_angle'],
-            analysis['shoulder']['height_difference'],
-            analysis['pelvic']['height_difference'],
-            total_score,
-            json.dumps(analysis)
-        ] + landmark_values
-        
-        # 저장 작업을 큐에 추가 (비동기)
-        save_data = {
-            'query': f'''
-                INSERT INTO pose_grade_data 
-                ({', '.join(columns)})
-                VALUES ({', '.join(placeholders)})
-            ''',
-            'values': values
-        }
-        
         try:
-            self.save_queue.put_nowait(save_data)
-        except queue.Full:
-            print("저장 큐가 가득 찼습니다. 일부 데이터가 손실될 수 있습니다.")
+            # 33개 랜드마크를 66개 개별 컬럼으로 변환 (visibility 필터링 적용)
+            landmark_values = []
+            for i, landmark in enumerate(landmarks):
+                # visibility < 0.5인 경우 -1로 저장
+                if hasattr(landmark, 'visibility') and landmark.visibility < 0.5:
+                    landmark_values.extend([-1, -1])  # x, y 모두 -1
+                else:
+                    landmark_values.extend([landmark.x, landmark.y])
+            
+            # 66개 랜드마크 컬럼명 생성
+            landmark_columns = []
+            for i in range(33):
+                landmark_columns.extend([f'landmark_{i}_x', f'landmark_{i}_y'])
+            
+            # SQL 쿼리 생성
+            columns = ['timestamp', 'participant_id', 'view_angle', 'pose_grade', 'auto_grade',
+                      'neck_angle', 'spine_angle', 'shoulder_asymmetry', 'pelvic_tilt', 
+                      'total_score', 'analysis_results'] + landmark_columns
+            
+            placeholders = ['?'] * len(columns)
+            
+            values = [
+                datetime.now().isoformat(),
+                participant_id,
+                self.current_view,
+                self.current_pose,
+                auto_grade,
+                analysis['neck']['neck_angle'],
+                analysis['spine']['spine_angle'],
+                analysis['shoulder']['height_difference'],
+                analysis['pelvic']['height_difference'],
+                total_score,
+                json.dumps(analysis)
+            ] + landmark_values
+            
+            # 저장 작업을 큐에 추가 (비동기)
+            save_data = {
+                'query': f'''
+                    INSERT INTO pose_grade_data 
+                    ({', '.join(columns)})
+                    VALUES ({', '.join(placeholders)})
+                ''',
+                'values': values
+            }
+            
+            try:
+                self.save_queue.put_nowait(save_data)
+            except queue.Full:
+                print("저장 큐가 가득 찼습니다. 일부 데이터가 손실될 수 있습니다.")
+                # 큐가 가득 찬 경우 가장 오래된 데이터 제거하고 새 데이터 추가
+                try:
+                    self.save_queue.get_nowait()  # 가장 오래된 데이터 제거
+                    self.save_queue.put_nowait(save_data)  # 새 데이터 추가
+                except:
+                    pass
+                    
+        except Exception as e:
+            print(f"데이터 준비 오류: {e}")
         
     def save_data_realtime(self, participant_id, landmarks, analysis, auto_grade=None, total_score=None):
         """실시간 데이터 저장 - 66개 개별 컬럼으로 변경 (동기 버전 - 호환성용)"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        # 33개 랜드마크를 66개 개별 컬럼으로 변환 (visibility 필터링 적용)
-        landmark_values = []
-        for i, landmark in enumerate(landmarks):
-            # visibility < 0.5인 경우 -1로 저장
-            if hasattr(landmark, 'visibility') and landmark.visibility < 0.5:
-                landmark_values.extend([-1, -1])  # x, y 모두 -1
-            else:
-                landmark_values.extend([landmark.x, landmark.y])
-        
-        # 66개 랜드마크 컬럼명 생성
-        landmark_columns = []
-        for i in range(33):
-            landmark_columns.extend([f'landmark_{i}_x', f'landmark_{i}_y'])
-        
-        # SQL 쿼리 생성
-        columns = ['timestamp', 'participant_id', 'view_angle', 'pose_grade', 'auto_grade',
-                  'neck_angle', 'spine_angle', 'shoulder_asymmetry', 'pelvic_tilt', 
-                  'total_score', 'analysis_results'] + landmark_columns
-        
-        placeholders = ['?'] * len(columns)
-        
-        values = [
-            datetime.now().isoformat(),
-            participant_id,
-            self.current_view,
-            self.current_pose,
-            auto_grade,
-            analysis['neck']['neck_angle'],
-            analysis['spine']['spine_angle'],
-            analysis['shoulder']['height_difference'],
-            analysis['pelvic']['height_difference'],
-            total_score,
-            json.dumps(analysis)
-        ] + landmark_values
-        
-        cursor.execute(f'''
-            INSERT INTO pose_grade_data 
-            ({', '.join(columns)})
-            VALUES ({', '.join(placeholders)})
-        ''', values)
-        
-        conn.commit()
-        conn.close()
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # 33개 랜드마크를 66개 개별 컬럼으로 변환 (visibility 필터링 적용)
+            landmark_values = []
+            for i, landmark in enumerate(landmarks):
+                # visibility < 0.5인 경우 -1로 저장
+                if hasattr(landmark, 'visibility') and landmark.visibility < 0.5:
+                    landmark_values.extend([-1, -1])  # x, y 모두 -1
+                else:
+                    landmark_values.extend([landmark.x, landmark.y])
+            
+            # 66개 랜드마크 컬럼명 생성
+            landmark_columns = []
+            for i in range(33):
+                landmark_columns.extend([f'landmark_{i}_x', f'landmark_{i}_y'])
+            
+            # SQL 쿼리 생성
+            columns = ['timestamp', 'participant_id', 'view_angle', 'pose_grade', 'auto_grade',
+                      'neck_angle', 'spine_angle', 'shoulder_asymmetry', 'pelvic_tilt', 
+                      'total_score', 'analysis_results'] + landmark_columns
+            
+            placeholders = ['?'] * len(columns)
+            
+            values = [
+                datetime.now().isoformat(),
+                participant_id,
+                self.current_view,
+                self.current_pose,
+                auto_grade,
+                analysis['neck']['neck_angle'],
+                analysis['spine']['spine_angle'],
+                analysis['shoulder']['height_difference'],
+                analysis['pelvic']['height_difference'],
+                total_score,
+                json.dumps(analysis)
+            ] + landmark_values
+            
+            cursor.execute(f'''
+                INSERT INTO pose_grade_data 
+                ({', '.join(columns)})
+                VALUES ({', '.join(placeholders)})
+            ''', values)
+            
+            conn.commit()
+            conn.close()
+            
+        except Exception as e:
+            print(f"동기 데이터 저장 실패: {e}")
         
     def print_analysis_to_console(self, analysis, auto_grade=None, total_score=None, frame_count=None):
         """콘솔에 분석 결과 출력"""
@@ -572,8 +619,12 @@ class PoseGradeCollector:
         queue_text = f"저장 대기: {queue_size}개"
         frame = put_korean_text(expanded_frame, queue_text, (console_x, 250), 12, (0, 0, 0))
         
+        # 저장 통계 표시
+        stats_text = f"저장 성공: {self.save_success_count}, 실패: {self.save_fail_count}"
+        frame = put_korean_text(expanded_frame, stats_text, (console_x, 270), 12, (0, 0, 0))
+        
         # 키보드 안내
-        y_offset = 280
+        y_offset = 300
         frame = put_korean_text(expanded_frame, "[키보드 안내]", (console_x, y_offset), 14, (0, 0, 0))
         y_offset += 25
         frame = put_korean_text(expanded_frame, "1,2,3: 시점 변경", (console_x, y_offset), 12, (0, 0, 0))
