@@ -10,7 +10,6 @@ ESP32_STREAM_URL = 'http://192.168.0.99:81/stream' # 본인 ip주소 찾아서 �
 # 저장 디렉토리 설정
 OUTPUT_DIR = "pose_outputs"
 
-ㅇ렇게 바꾸라고? 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # MediaPipe 초기화
