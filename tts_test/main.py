@@ -28,4 +28,3 @@ while True:
     wav = model.tts_to_file(text, speaker_ids['KR'], output_path, speed=speed)
     sd.play(wav, model.hps.data.sampling_rate)
     sd.wait()
-    

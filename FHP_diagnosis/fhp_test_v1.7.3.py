@@ -37,11 +37,11 @@ def calculate_hpd(tragus, shoulder):
 
 #자세 진단 해석
 def evaluate_posture_korean(cva):
-    if cva < 60:
+    if cva < 45:
         return "중증 거북목", (0, 0, 255)
-    elif cva < 75:
+    elif cva < 55:
         return "중등도 거북목", (0, 0, 200)
-    elif cva < 90:
+    elif cva < 65:
         return "경도 거북목", (0, 165, 255)
     else:
         return "정상 자세", (0, 255, 0)

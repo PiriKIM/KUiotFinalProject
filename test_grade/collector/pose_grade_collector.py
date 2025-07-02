@@ -10,11 +10,13 @@ import sys
 import threading
 import queue
 from PIL import Image, ImageDraw, ImageFont
+import pickle
 
 # 상위 디렉토리 경로 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.posture_analyzer import PostureAnalyzer
+from utils.text_utils import put_korean_text
 
 # 전역 폰트 변수
 _global_font = None
@@ -92,7 +94,6 @@ class PoseGradeCollector:
         
         # 키보드 입력을 위한 변수들
         self.current_view = "1"  # 기본값: 정면
-        self.current_pose = "a"  # 기본값: A등급
         self.auto_grade_mode = False  # 자동 등급 판별 모드
         self.key_queue = queue.Queue()
         self.running = True
@@ -105,8 +106,13 @@ class PoseGradeCollector:
         self.save_thread = None
         self.save_thread_running = True
         
+        # 자동 등급 판별 모델 로드
+        self.grade_model = None
+        self.feature_names = None
+        self.load_grade_model()
+        
     def init_database(self):
-        """데이터베이스 초기화 - 66개 개별 컬럼으로 변경"""
+        """데이터베이스 초기화 - auto_grade 사용"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -126,7 +132,6 @@ class PoseGradeCollector:
                 timestamp TEXT,
                 participant_id TEXT,
                 view_angle TEXT,
-                pose_grade TEXT,
                 auto_grade TEXT,
                 neck_angle REAL,
                 spine_angle REAL,
@@ -140,7 +145,7 @@ class PoseGradeCollector:
         
         conn.commit()
         conn.close()
-        print("데이터베이스 초기화 완료 - 새로운 스키마로 재생성됨")
+        print("데이터베이스 초기화 완료 - auto_grade 사용")
         
     def start_save_thread(self):
         """데이터 저장 스레드 시작"""
@@ -194,12 +199,6 @@ class PoseGradeCollector:
         print("  1: 정면")
         print("  2: 측면")
         print("  3: 정면도 측면도 아닌 상태")
-        print("자세 등급 (수동):")
-        print("  a: A등급 (완벽한 자세)")
-        print("  b: B등급 (양호한 자세)")
-        print("  c: C등급 (보통 자세)")
-        print("  d: D등급 (나쁜 자세)")
-        print("  e: 특수 자세 (팔 들기, 움직임, 기타 특수 자세)")
         print("자동 등급 판별:")
         print("  auto: 자동 등급 판별 모드 토글")
         print("종료: q")
@@ -208,7 +207,7 @@ class PoseGradeCollector:
         while self.running:
             try:
                 key = input().lower().strip()
-                if key in ['1', '2', '3', 'a', 'b', 'c', 'd', 'e', 'auto', 'q']:
+                if key in ['1', '2', '3', 'auto', 'q']:
                     self.key_queue.put(key)
                     if key == 'q':
                         self.running = False
@@ -217,37 +216,33 @@ class PoseGradeCollector:
                 self.running = False
                 break
         
-    def process_keyboard_input(self):
-        """키보드 입력 처리"""
+    def process_key_input(self):
+        """키보드 입력 처리 - auto_grade 모드로 변경"""
         try:
-            while not self.key_queue.empty():
+            if not self.key_queue.empty():
                 key = self.key_queue.get_nowait()
                 
+                # 시점 변경 (1, 2, 3)
                 if key in ['1', '2', '3']:
                     self.current_view = key
-                    view_names = {
-                        '1': '정면',
-                        '2': '측면',
-                        '3': '기타 상태'
-                    }
-                    print(f"시점 변경: {view_names[key]}")
-                    
-                elif key in ['a', 'b', 'c', 'd', 'e']:
-                    self.current_pose = key
-                    self.auto_grade_mode = False  # 수동 입력 시 자동 모드 해제
-                    pose_names = {
-                        'a': 'A등급 (완벽)',
-                        'b': 'B등급 (양호)',
-                        'c': 'C등급 (보통)',
-                        'd': 'D등급 (나쁨)',
-                        'e': '특수 자세'
-                    }
-                    print(f"자세 등급: {pose_names[key]} (수동)")
-                    
-                elif key == 'auto':
+                    view_names = {'1': '정면', '2': '측면', '3': '기타 상태'}
+                    print(f"시점 변경: {view_names.get(key, '알 수 없음')} ({key})")
+                
+                # 자동 등급 모드 토글
+                elif key.lower() == 'auto':
                     self.auto_grade_mode = not self.auto_grade_mode
-                    mode_text = "활성화" if self.auto_grade_mode else "비활성화"
-                    print(f"자동 등급 판별 모드: {mode_text}")
+                    mode_status = "활성화" if self.auto_grade_mode else "비활성화"
+                    print(f"자동 등급 판별 모드: {mode_status}")
+                    
+                    if self.auto_grade_mode and self.grade_model is None:
+                        print("경고: 등급 판별 모델이 로드되지 않았습니다.")
+                        print("모델을 훈련한 후 다시 시도하세요.")
+                        self.auto_grade_mode = False
+                
+                # 종료
+                elif key.lower() == 'q':
+                    self.running = False
+                    print("데이터 수집을 종료합니다.")
                     
         except queue.Empty:
             pass
@@ -277,7 +272,7 @@ class PoseGradeCollector:
                 continue
                 
             # 키보드 입력 처리
-            self.process_keyboard_input()
+            self.process_key_input()
                 
             # BGR to RGB 변환
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -291,15 +286,16 @@ class PoseGradeCollector:
                     # 자세 분석 수행
                     analysis = self.analyze_posture(landmarks)
                     
-                    # 자동 등급 판별 (모드가 활성화된 경우)
+                    # 자동 등급 판별
                     auto_grade = None
                     total_score = None
                     if self.auto_grade_mode:
-                        comprehensive_grade = self.analyzer.get_comprehensive_grade(landmarks)
-                        auto_grade = comprehensive_grade['total_grade']
-                        total_score = comprehensive_grade['total_score']
-                        # 자동 등급을 현재 등급으로 설정
-                        self.current_pose = auto_grade.lower()
+                        auto_grade, total_score = self.predict_grade(analysis)
+                    
+                    # auto_grade가 None인 경우 기본값 설정
+                    if auto_grade is None:
+                        auto_grade = 'c'  # 기본값: C등급
+                        total_score = 70  # 기본 점수
                     
                     # 비동기 데이터 저장 (메인 스레드 블로킹 없음)
                     self.save_data_async(participant_id, landmarks, analysis, auto_grade, total_score)
@@ -367,7 +363,7 @@ class PoseGradeCollector:
             landmark_columns.extend([f'landmark_{i}_x', f'landmark_{i}_y'])
         
         # SQL 쿼리 생성
-        columns = ['timestamp', 'participant_id', 'view_angle', 'pose_grade', 'auto_grade',
+        columns = ['timestamp', 'participant_id', 'view_angle', 'auto_grade',
                   'neck_angle', 'spine_angle', 'shoulder_asymmetry', 'pelvic_tilt', 
                   'total_score', 'analysis_results'] + landmark_columns
         
@@ -377,7 +373,6 @@ class PoseGradeCollector:
             datetime.now().isoformat(),
             participant_id,
             self.current_view,
-            self.current_pose,
             auto_grade,
             analysis['neck']['neck_angle'],
             analysis['spine']['spine_angle'],
@@ -422,7 +417,7 @@ class PoseGradeCollector:
             landmark_columns.extend([f'landmark_{i}_x', f'landmark_{i}_y'])
         
         # SQL 쿼리 생성
-        columns = ['timestamp', 'participant_id', 'view_angle', 'pose_grade', 'auto_grade',
+        columns = ['timestamp', 'participant_id', 'view_angle', 'auto_grade',
                   'neck_angle', 'spine_angle', 'shoulder_asymmetry', 'pelvic_tilt', 
                   'total_score', 'analysis_results'] + landmark_columns
         
@@ -432,7 +427,6 @@ class PoseGradeCollector:
             datetime.now().isoformat(),
             participant_id,
             self.current_view,
-            self.current_pose,
             auto_grade,
             analysis['neck']['neck_angle'],
             analysis['spine']['spine_angle'],
@@ -467,11 +461,13 @@ class PoseGradeCollector:
                      'd': 'D등급 (나쁨)', 'e': '특수 자세'}
         
         if self.auto_grade_mode and auto_grade:
-            print(f"자세 등급: {pose_names.get(self.current_pose, '알 수 없음')} (자동 판별)")
+            print(f"자세 등급: {pose_names.get(auto_grade, '알 수 없음')} (자동 판별)")
             if total_score is not None:
                 print(f"종합 점수: {total_score:.1f}/100")
         else:
-            print(f"자세 등급: {pose_names.get(self.current_pose, '알 수 없음')} (수동 입력)")
+            print(f"자세 등급: {pose_names.get(auto_grade, '알 수 없음')} (기본값)")
+            if total_score is not None:
+                print(f"종합 점수: {total_score:.1f}/100")
         
         # 자세 분석 상세 정보
         print(f"\n[상세 분석]")
@@ -489,15 +485,13 @@ class PoseGradeCollector:
         if analysis['shoulder']['is_asymmetric']:
             issues.append("어깨 비대칭")
         if analysis['pelvic']['is_tilted']:
-            issues.append("골반 기울어짐")
-        
+            issues.append("골반 기울기")
+            
         if issues:
-            print(f"\n[발견된 문제점]")
-            for issue in issues:
-                print(f"  - {issue}")
+            print(f"발견된 문제점: {', '.join(issues)}")
         else:
-            print(f"\n[발견된 문제점] 없음")
-        
+            print("발견된 문제점: 없음")
+            
         print("="*50)
         
     def draw_info_realtime(self, frame, frame_count):
@@ -528,20 +522,20 @@ class PoseGradeCollector:
                      'd': 'D등급 (나쁨)', 'e': '특수 자세'}
         
         # 등급별 색상 설정
-        if self.current_pose in ['a', 'b']:
+        if auto_grade in ['a', 'b']:
             pose_color = (0, 128, 0)  # 진한 녹색
-        elif self.current_pose == 'c':
+        elif auto_grade == 'c':
             pose_color = (0, 100, 200)  # 진한 주황색
-        elif self.current_pose == 'd':
+        elif auto_grade == 'd':
             pose_color = (0, 0, 200)  # 진한 빨간색
         else:  # e등급
             pose_color = (200, 0, 200)  # 진한 마젠타
         
         # 등급 표시
-        if self.auto_grade_mode:
-            grade_text = f"자세: {pose_names.get(self.current_pose, '알 수 없음')} (자동)"
+        if self.auto_grade_mode and auto_grade:
+            grade_text = f"자세: {pose_names.get(auto_grade, '알 수 없음')} (자동)"
         else:
-            grade_text = f"자세: {pose_names.get(self.current_pose, '알 수 없음')} (수동)"
+            grade_text = f"자세: {pose_names.get(auto_grade, '알 수 없음')} (기본값)"
         
         frame = put_korean_text(expanded_frame, grade_text, (console_x, 100), 16, pose_color)
         
@@ -578,13 +572,172 @@ class PoseGradeCollector:
         y_offset += 25
         frame = put_korean_text(expanded_frame, "1,2,3: 시점 변경", (console_x, y_offset), 12, (0, 0, 0))
         y_offset += 20
-        frame = put_korean_text(expanded_frame, "a,b,c,d,e: 수동 등급", (console_x, y_offset), 12, (0, 0, 0))
-        y_offset += 20
         frame = put_korean_text(expanded_frame, "auto: 자동 등급 토글", (console_x, y_offset), 12, (0, 0, 0))
         y_offset += 20
         frame = put_korean_text(expanded_frame, "q: 종료", (console_x, y_offset), 12, (0, 0, 0))
         
         return expanded_frame
+
+    def load_grade_model(self):
+        """훈련된 등급 판별 모델 로드"""
+        # 여러 가능한 경로에서 모델 파일 찾기
+        possible_paths = [
+            "pose_grade_model.pkl",
+            "test_grade/ml_models/pose_grade_model.pkl",
+            "../ml_models/pose_grade_model.pkl",
+            os.path.join(os.path.dirname(__file__), "../ml_models/pose_grade_model.pkl")
+        ]
+        
+        model_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                model_path = path
+                break
+                
+        if model_path:
+            try:
+                with open(model_path, 'rb') as f:
+                    model_data = pickle.load(f)
+                    self.grade_model = model_data['model']
+                    self.feature_names = model_data['feature_names']
+                print(f"등급 판별 모델 로드 완료: {model_path}")
+            except Exception as e:
+                print(f"모델 로드 실패: {e}")
+                self.grade_model = None
+        else:
+            print("모델 파일을 찾을 수 없습니다. 다음 경로들을 확인했습니다:")
+            for path in possible_paths:
+                print(f"  - {path}")
+            print("자동 등급 판별 기능을 사용하려면 먼저 모델을 훈련하세요.")
+        
+    def predict_grade(self, analysis):
+        """자동 등급 판별 - 개선된 버전"""
+        if self.grade_model is None:
+            return None, None
+            
+        try:
+            # 특성 추출 (훈련 시와 동일한 방식)
+            basic_features = [
+                analysis['neck']['neck_angle'],
+                analysis['spine']['spine_angle'],
+                analysis['shoulder']['height_difference'],
+                analysis['pelvic']['height_difference']
+            ]
+            
+            # 시점 정보 (원-핫 인코딩)
+            view_features = [1 if self.current_view == '1' else 0,  # 정면
+                           1 if self.current_view == '2' else 0]   # 측면
+            
+            # 목 관련 추가 특성
+            neck_features = [
+                analysis['neck']['vertical_deviation'],
+                analysis['neck']['neck_angle']
+            ]
+            
+            # 척추 관련 추가 특성
+            spine_features = [
+                analysis['spine']['spine_angle'],
+                1 if analysis['spine']['is_hunched'] else 0
+            ]
+            
+            # 어깨 관련 추가 특성
+            shoulder_features = [
+                analysis['shoulder']['height_difference'],
+                analysis['shoulder']['shoulder_angle'],
+                1 if analysis['shoulder']['is_asymmetric'] else 0
+            ]
+            
+            # 골반 관련 추가 특성
+            pelvic_features = [
+                analysis['pelvic']['height_difference'],
+                analysis['pelvic']['pelvic_angle'],
+                1 if analysis['pelvic']['is_tilted'] else 0
+            ]
+            
+            # 새로운 파생 특성들 (훈련 시와 동일)
+            derived_features = [
+                # 목과 척추의 상호작용
+                abs(analysis['neck']['neck_angle']) * abs(analysis['spine']['spine_angle']),
+                
+                # 어깨와 골반의 비대칭성 합계
+                analysis['shoulder']['height_difference'] + analysis['pelvic']['height_difference'],
+                
+                # 전체 자세 점수 (간단한 계산)
+                100 - (abs(analysis['neck']['neck_angle']) * 2 + 
+                       abs(analysis['spine']['spine_angle']) * 2 +
+                       analysis['shoulder']['height_difference'] * 1000 +
+                       analysis['pelvic']['height_difference'] * 1000),
+                
+                # 목 각도의 제곱 (비선형 관계)
+                analysis['neck']['neck_angle'] ** 2,
+                
+                # 척추 각도의 제곱
+                analysis['spine']['spine_angle'] ** 2,
+                
+                # 어깨 비대칭성의 제곱
+                analysis['shoulder']['height_difference'] ** 2,
+                
+                # 골반 기울기의 제곱
+                analysis['pelvic']['height_difference'] ** 2,
+                
+                # 문제점 개수
+                (1 if analysis['spine']['is_hunched'] else 0) +
+                (1 if analysis['shoulder']['is_asymmetric'] else 0) +
+                (1 if analysis['pelvic']['is_tilted'] else 0) +
+                (1 if analysis['neck']['grade'] in ['C', 'D'] else 0)
+            ]
+            
+            # 모든 특성 결합
+            features = (basic_features + view_features + neck_features + 
+                       spine_features + shoulder_features + pelvic_features + derived_features)
+            
+            # 예측 수행
+            prediction = self.grade_model.predict([features])[0]
+            
+            # 종합 점수 계산 (개선된 방식)
+            total_score = self.calculate_total_score(analysis)
+            
+            return prediction, total_score
+            
+        except Exception as e:
+            print(f"등급 예측 중 오류: {e}")
+            return None, None
+            
+    def calculate_total_score(self, analysis):
+        """종합 점수 계산"""
+        score = 100
+        
+        # 목 각도에 따른 점수 차감
+        neck_angle = abs(analysis['neck']['neck_angle'])
+        if neck_angle > 15:
+            score -= 20
+        elif neck_angle > 10:
+            score -= 10
+        elif neck_angle > 5:
+            score -= 5
+            
+        # 척추 각도에 따른 점수 차감
+        spine_angle = abs(analysis['spine']['spine_angle'])
+        if spine_angle > 10:
+            score -= 20
+        elif spine_angle > 5:
+            score -= 10
+            
+        # 어깨 비대칭에 따른 점수 차감
+        shoulder_diff = analysis['shoulder']['height_difference']
+        if shoulder_diff > 0.05:
+            score -= 15
+        elif shoulder_diff > 0.02:
+            score -= 8
+            
+        # 골반 기울기에 따른 점수 차감
+        pelvic_diff = analysis['pelvic']['height_difference']
+        if pelvic_diff > 0.05:
+            score -= 15
+        elif pelvic_diff > 0.02:
+            score -= 8
+            
+        return max(0, score)
 
 def main():
     collector = PoseGradeCollector()
