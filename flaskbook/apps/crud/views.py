@@ -16,60 +16,61 @@ crud = Blueprint(
 
 analyzer = PostureAnalyzer()
 
-# 상태 관리 클래스
-class PoseStateManager:
+# 상태 관리 클래스 (ESP32-CAM 전용으로 단순화)
+class ESP32PoseStateManager:
     def __init__(self):
-        self.state = "no_human_detected"
+        self.state = "waiting_for_connection"
         self.state_start_time = time.time()
         self.last_state_change = time.time()
-        self.front_pose_frames = []  # 20프레임 저장용
+        self.front_pose_frames = []
         self.front_pose_area = None
         self.prev_landmarks = None
         self.front_pose_stable_start = None
-        self.no_landmark_start = None
-        self.SIDE_RATIO = 0.7  # 측면 면적 비율 기준
         self.STABLE_DURATION = 2.0  # 정면 안정화 시간
         self.MOVE_THRESHOLD = 0.02  # landmark 이동량 임계값
-        self.NO_LANDMARK_TIMEOUT = 10.0  # 관절 미감지 10초
 
     def update_state(self, landmarks):
         current_time = time.time()
-        # 상태 1: no_human_detected
-        if self.state == "no_human_detected":
+        
+        # 상태 1: waiting_for_connection
+        if self.state == "waiting_for_connection":
             if landmarks is not None:
-                print("[전이] no_human_detected → detecting_front_pose")
+                print("[전이] waiting_for_connection → detecting_front_pose")
                 self.state = "detecting_front_pose"
                 self.state_start_time = current_time
                 self.front_pose_frames = []
                 self.prev_landmarks = None
                 self.front_pose_stable_start = None
-                self.no_landmark_start = None
+        
         # 상태 2: detecting_front_pose
         elif self.state == "detecting_front_pose":
             if landmarks is None:
-                print("[전이] detecting_front_pose → no_human_detected")
-                self.state = "no_human_detected"
+                print("[전이] detecting_front_pose → waiting_for_connection")
+                self.state = "waiting_for_connection"
                 self.state_start_time = current_time
                 self.front_pose_frames = []
                 self.prev_landmarks = None
                 self.front_pose_stable_start = None
-                self.no_landmark_start = current_time
                 return
+            
             # 어깨, 귀, 코 좌표만 추출
             key_indices = [mp.solutions.pose.PoseLandmark.LEFT_SHOULDER.value, mp.solutions.pose.PoseLandmark.RIGHT_SHOULDER.value,
                            mp.solutions.pose.PoseLandmark.LEFT_EAR.value, mp.solutions.pose.PoseLandmark.RIGHT_EAR.value,
                            mp.solutions.pose.PoseLandmark.NOSE.value]
             keypoints = np.array([[landmarks[i].x, landmarks[i].y] for i in key_indices])
+            
             # 20프레임 저장
             self.front_pose_frames.append(keypoints)
             if len(self.front_pose_frames) > 20:
                 self.front_pose_frames.pop(0)
+            
             # 이동량 계산
             if self.prev_landmarks is not None:
                 move = np.linalg.norm(keypoints - self.prev_landmarks, axis=1).mean()
             else:
                 move = 0
             self.prev_landmarks = keypoints
+            
             # 안정화 시작 체크
             if move < self.MOVE_THRESHOLD:
                 if self.front_pose_stable_start is None:
@@ -81,7 +82,6 @@ class PoseStateManager:
                     right_shoulder = arr[:,1]
                     left_ear = arr[:,2]
                     right_ear = arr[:,3]
-                    # 어깨-귀 사각형 넓이(대략적)
                     width = np.linalg.norm(left_shoulder - right_shoulder, axis=1).mean()
                     height = np.linalg.norm(left_ear - left_shoulder, axis=1).mean()
                     area = width * height
@@ -95,20 +95,16 @@ class PoseStateManager:
                     self.front_pose_stable_start = None
             else:
                 self.front_pose_stable_start = None
+        
         # 상태 3: waiting_side_pose
         elif self.state == "waiting_side_pose":
             if landmarks is None:
-                if self.no_landmark_start is None:
-                    self.no_landmark_start = current_time
-                elif current_time - self.no_landmark_start > self.NO_LANDMARK_TIMEOUT:
-                    print("[전이] waiting_side_pose → no_human_detected (관절 미감지 10초)")
-                    self.state = "no_human_detected"
-                    self.state_start_time = current_time
-                    self.front_pose_area = None
-                    self.no_landmark_start = None
+                print("[전이] waiting_side_pose → waiting_for_connection")
+                self.state = "waiting_for_connection"
+                self.state_start_time = current_time
+                self.front_pose_area = None
                 return
-            else:
-                self.no_landmark_start = None
+            
             # 측면 판별: 정면 면적 대비 70% 이하로 줄어들면
             key_indices = [mp.solutions.pose.PoseLandmark.LEFT_SHOULDER.value, mp.solutions.pose.PoseLandmark.RIGHT_SHOULDER.value,
                            mp.solutions.pose.PoseLandmark.LEFT_EAR.value, mp.solutions.pose.PoseLandmark.RIGHT_EAR.value]
@@ -116,24 +112,24 @@ class PoseStateManager:
             width = np.linalg.norm(keypoints[0] - keypoints[1])
             height = np.linalg.norm(keypoints[2] - keypoints[0])
             area = width * height
-            if self.front_pose_area and area < self.front_pose_area * self.SIDE_RATIO:
+            
+            if self.front_pose_area and area < self.front_pose_area * 0.7:
                 print(f"[전이] waiting_side_pose → analyzing_side_pose (측면 감지, 면적:{area:.4f})")
                 self.state = "analyzing_side_pose"
                 self.state_start_time = current_time
                 self.last_state_change = current_time
+        
         # 상태 4: analyzing_side_pose
         elif self.state == "analyzing_side_pose":
             if landmarks is None:
-                print("[전이] analyzing_side_pose → no_human_detected (관절 미감지)")
-                self.state = "no_human_detected"
+                print("[전이] analyzing_side_pose → waiting_for_connection")
+                self.state = "waiting_for_connection"
                 self.state_start_time = current_time
                 self.front_pose_area = None
-                self.no_landmark_start = current_time
-            # 분석 동작은 외부에서 수행
 
     def get_state_message(self):
-        if self.state == "no_human_detected":
-            return "카메라 앞에 앉아주세요"
+        if self.state == "waiting_for_connection":
+            return "ESP32-CAM 연결을 기다리는 중..."
         elif self.state == "detecting_front_pose":
             return "정면 자세 측정을 시작합니다."
         elif self.state == "waiting_side_pose":
@@ -143,7 +139,7 @@ class PoseStateManager:
         return "알 수 없는 상태"
 
 # 전역 상태 관리자 인스턴스
-state_manager = PoseStateManager()
+state_manager = ESP32PoseStateManager()
 
 def login_required(f):
     """로그인 필요 데코레이터"""
@@ -179,7 +175,7 @@ def analyze():
         if result.pose_landmarks:
             lm = result.pose_landmarks.landmark
             
-            # [AI 수정] 상체 랜드마크만 추출 (얼굴 제외, 귀부터 시작)
+            # 상체 랜드마크만 추출 (얼굴 제외, 귀부터 시작)
             upper_body_landmarks = []
             for i, landmark in enumerate(lm):
                 if i >= 7:  # 귀부터 시작 (7: LEFT_EAR, 8: RIGHT_EAR, 11: 어깨)
@@ -187,9 +183,11 @@ def analyze():
             
             # 상태 업데이트
             state_manager.update_state(lm)
+            print(f"현재 상태: {state_manager.state}")
             
             # 분석 중일 때만 자세 분석 실행
             if state_manager.state == "analyzing_side_pose":
+                print("측면 자세 분석 시작")
                 # 자세 분석 수행
                 neck_result = analyzer.analyze_turtle_neck_detailed(lm)
                 spine_result = analyzer.analyze_spine_curvature(lm)
@@ -218,15 +216,18 @@ def analyze():
                 posture_record.overall_score = posture_record.calculate_overall_score()
                 posture_record.overall_grade = posture_record.calculate_overall_grade()
                 
+                print(f"계산된 점수: {posture_record.overall_score}, 등급: {posture_record.overall_grade}")
+                
                 try:
                     db.session.add(posture_record)
                     db.session.commit()
+                    print("데이터베이스 저장 성공")
                 except Exception as e:
                     db.session.rollback()
                     print(f"데이터베이스 저장 오류: {e}")
                 
-                return jsonify({
-                    'landmarks': upper_body_landmarks,  # [AI 추가] 상체 랜드마크 반환
+                response_data = {
+                    'landmarks': upper_body_landmarks,
                     'state': state_manager.state,
                     'state_message': state_manager.get_state_message(),
                     'neck': neck_result,
@@ -236,7 +237,9 @@ def analyze():
                     'twist': twist_result,
                     'overall_score': posture_record.overall_score,
                     'overall_grade': posture_record.overall_grade
-                })
+                }
+                print(f"응답 데이터: {response_data}")
+                return jsonify(response_data)
             else:
                 # 분석 중이 아닐 때는 상태 정보만 반환
                 stable_time = None
@@ -244,58 +247,13 @@ def analyze():
                     stable_time = time.time() - state_manager.front_pose_stable_start
                 
                 return jsonify({
-                    'landmarks': upper_body_landmarks,  # [AI 추가] 상체 랜드마크 반환
+                    'landmarks': upper_body_landmarks,
                     'state': state_manager.state,
                     'state_message': state_manager.get_state_message(),
                     'stable_time': stable_time
                 })
         else:
             return jsonify({'error': 'No person detected'})
-
-@crud.route('/analyze_batch', methods=['POST'])
-@login_required
-def analyze_batch():
-    data = request.get_json()
-    landmark_batches = data.get("landmark_batches", [])
-
-    if not landmark_batches:
-        return jsonify({"error": "No landmark data received"}), 400
-
-    try:
-        result = analyzer.analyze_average_posture(landmark_batches)
-
-        # ✅ 저장 로직 추가
-        user = User.query.get(session['user_id'])
-        record = PostureRecord(
-            user_id=user.id,
-            neck_angle=result['neck']['neck_angle'],
-            neck_grade=result['neck']['grade'],
-            neck_description=result['neck']['grade_description'],
-            spine_is_hunched=result['spine']['is_hunched'],
-            spine_angle=result['spine']['spine_angle'],
-            shoulder_is_asymmetric=result['shoulder']['is_asymmetric'],
-            shoulder_height_difference=result['shoulder']['height_difference'],
-            pelvic_is_tilted=result['pelvic']['is_tilted'],
-            pelvic_angle=result['pelvic']['pelvic_angle'],
-            spine_is_twisted=result['twist']['is_twisted'],
-            spine_alignment=result['twist']['spine_alignment'],
-        )
-        record.overall_score = record.calculate_overall_score()
-        record.overall_grade = record.calculate_overall_grade()
-        db.session.add(record)
-        db.session.commit()
-
-        return jsonify(result)
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
-
-@crud.route('/average')
-@login_required
-def average_page():
-    user = User.query.get(session['user_id'])
-    return render_template('crud/index_avg.html', user=user)
 
 @crud.route('/history')
 @login_required
@@ -351,11 +309,10 @@ def statistics():
         recent_avg = 0
         monthly_stats = {}
     
-    return render_template('crud/statistics.html',
+    return render_template('crud/statistics.html', 
                          user=user,
                          total_records=total_records,
                          avg_score=avg_score,
                          grade_counts=grade_counts,
                          recent_avg=recent_avg,
-                         monthly_stats=monthly_stats,
-                         now=datetime.now())
+                         monthly_stats=monthly_stats)
