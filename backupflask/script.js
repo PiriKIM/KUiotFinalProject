@@ -7,10 +7,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const scoreNumber = document.getElementById("score-number");
   const scoreGrade = document.getElementById("score-grade");
   const currentStateElement = document.getElementById("current-state");
-  const fpsIndicator = document.getElementById("fps-indicator");
+  const stateProgressElement = document.getElementById("state-progress");
+  const progressFillElement = document.getElementById("progress-fill");
   const cameraBtnText = document.getElementById("camera-btn-text");
-  const esp32Stream = document.getElementById("esp32-stream");
-  const modeSelect = document.getElementById("mode-select");
+  const fpsIndicator = document.getElementById("fps-indicator");
 
   let stream = null;
   let analyzing = false;
@@ -21,25 +21,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const SKELETON_CONNECTIONS = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28], [7, 11], [8, 12]];
 
-  // 카메라 모드 분기
-  window.startAnalysis = function () {
-    const mode = modeSelect.value;
-    if (mode === "webcam") {
-      esp32Stream.style.display = "none";
-      video.style.display = "block";
-      canvas.style.display = "block";
-      toggleCamera();
-    } else if (mode === "esp32") {
-      stopCamera();
-      video.style.display = "none";
-      canvas.style.display = "none";
-      esp32Stream.style.display = "block";
-      esp32Stream.src = "http://192.168.0.99:81/stream";  // 반드시 실제 주소 확인
-      fetch("/start-stream");
-    }
-  }
-
-  // 웹캠 토글
   window.toggleCamera = async function () {
     if (!stream) {
       try {
@@ -56,7 +37,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  // 웹캠 종료
   function stopCamera() {
     if (stream) {
       stream.getTracks().forEach(track => track.stop());

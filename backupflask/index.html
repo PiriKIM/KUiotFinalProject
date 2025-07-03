@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>자세 분석 시스템</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Arial', sans-serif;
+      background: #f4f4f4;
+    }
+    .container {
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+    }
+    .left, .right {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .video-container {
+      position: relative;
+      max-width: 640px;
+      margin: auto;
+    }
+    video, canvas, img {
+      width: 100%;
+      border-radius: 10px;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+    .controls {
+      margin-top: 10px;
+      text-align: center;
+    }
+    .btn {
+      padding: 10px 20px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 20px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    #fps-indicator {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="left">
+      <div class="video-container">
+        <!-- 웹캠 -->
+        <video id="webcam" autoplay muted playsinline></video>
+        <canvas id="canvas"></canvas>
+
+        <!-- ESP32 스트리밍 (처음엔 숨김) -->
+        <img id="esp32-stream" src="http://192.168.0.99:81/stream" style="display: none;">
+      </div>
+
+      <div class="controls">
+        <select id="mode-select">
+          <option value="webcam">웹캠 분석</option>
+          <option value="esp32">ESP32 스트리밍 분석</option>
+        </select>
+        <button class="btn" onclick="startAnalysis()">분석 시작</button>
+        <div id="fps-indicator">FPS: 0</div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div id="result">
+        <h3>자세 분석 결과</h3>
+        <div id="state-message">카메라를 시작해주세요</div>
+        <div id="score-box" style="display:none;">
+          <p><strong>점수:</strong> <span id="overall-score">0</span>점</p>
+          <p><strong>등급:</strong> <span id="overall-grade">-</span></p>
+          <p id="detail-description"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const esp32Stream = document.getElementById('esp32-stream');
+    const resultBox = document.getElementById('result');
+    const stateMessage = document.getElementById('state-message');
+    const fpsIndicator = document.getElementById('fps-indicator');
+    const scoreBox = document.getElementById('score-box');
+    const overallScore = document.getElementById('overall-score');
+    const overallGrade = document.getElementById('overall-grade');
+    const detailDescription = document.getElementById('detail-description');
+
+    let stream = null;
+    let lastAnalysisTime = 0;
+    let frameCount = 0;
+    let lastFpsTime = performance.now();
+    let latestLandmarks = [];
+
+    function startAnalysis() {
+      const mode = document.getElementById("mode-select").value;
+
+      if (mode === "webcam") {
+        esp32Stream.style.display = "none";
+        video.style.display = "block";
+        canvas.style.display = "block";
+        toggleCamera();
+      } else if (mode === "esp32") {
+        stopCamera();
+        video.style.display = "none";
+        canvas.style.display = "none";
+        esp32Stream.style.display = "block";
+
+        // Flask 백엔드 분석 시작 요청
+        fetch("/start-stream");
+      }
+    }
+
+    async function toggleCamera() {
+      if (stream) {
+        stopCamera();
+        return;
+      }
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        requestAnimationFrame(drawLoop);
+      } catch (err) {
+        alert("카메라를 사용할 수 없습니다.");
+        console.error(err);
+      }
+    }
+
+    function stopCamera() {
+      if (!stream) return;
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+
+    function drawLoop() {
+      if (!stream) return;
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (latestLandmarks.length > 0) {
+        drawLandmarks(latestLandmarks);
+      }
+
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFpsTime >= 1000) {
+        fpsIndicator.textContent = `FPS: ${frameCount}`;
+        frameCount = 0;
+        lastFpsTime = now;
+      }
+
+      if (now - lastAnalysisTime >= 200) {
+        analyzeFrame();
+        lastAnalysisTime = now;
+      }
+
+      requestAnimationFrame(drawLoop);
+    }
+
+    function analyzeFrame() {
+      canvas.toBlob(blob => {
+        const formData = new FormData();
+        formData.append('frame', blob, 'frame.jpg');
+
+        fetch('/crud/analyze', {
+          method: 'POST',
+          body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.landmarks) {
+            latestLandmarks = data.landmarks;
+          }
+
+          stateMessage.textContent = data.state_message || "상태 없음";
+
+          if (data.state === "analyzing_side_pose" && data.overall_score !== undefined) {
+            overallScore.textContent = data.overall_score;
+            overallGrade.textContent = data.overall_grade;
+            detailDescription.textContent = `
+              목: ${data.neck.grade_description} (${data.neck.neck_angle.toFixed(1)}°),
+              어깨: ${data.shoulder.is_asymmetric ? '비대칭' : '정상'},
+              척추: ${data.spine.is_hunched ? '굽음' : '정상'},
+              골반: ${data.pelvic.is_tilted ? '기울어짐' : '정상'},
+              척추틀어짐: ${data.twist.is_twisted ? '있음' : '없음'}
+            `;
+            scoreBox.style.display = "block";
+          }
+        });
+      }, 'image/jpeg');
+    }
+
+    function drawLandmarks(landmarks) {
+      ctx.strokeStyle = 'lime';
+      ctx.fillStyle = 'red';
+      ctx.lineWidth = 2;
+
+      const connections = [
+        [11,12],[11,13],[13,15],[12,14],[14,16],
+        [11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],
+        [7,11],[8,12]
+      ];
+      connections.forEach(([s,e]) => {
+        const a = landmarks.find(l => l.index === s);
+        const b = landmarks.find(l => l.index === e);
+        if (a && b) {
+          ctx.beginPath();
+          ctx.moveTo(a.x * canvas.width, a.y * canvas.height);
+          ctx.lineTo(b.x * canvas.width, b.y * canvas.height);
+          ctx.stroke();
+        }
+      });
+
+      landmarks.forEach(pt => {
+        ctx.beginPath();
+        ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 5, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+    }
+  </script>
+</body>
+</html>

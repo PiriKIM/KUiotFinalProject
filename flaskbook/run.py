@@ -1,21 +1,34 @@
-#!/usr/bin/env python3
-"""
-Flask 애플리케이션 실행 스크립트
-사용법: python run.py
-"""
+from flask import redirect, url_for, session
+import threading
+import webbrowser
+import time
 
+# Flask 앱 생성
 from apps.app import create_app
-
 app = create_app()
 
+# ESP32-CAM 영상 분석 함수
+from apps.crud.utils.esp_module import run_pose_tracking
+
+@app.route('/')
+def root():
+    # 로그인하지 않은 사용자는 로그인 페이지로 리다이렉트
+    if 'user_id' not in session:
+        return redirect(url_for('auth.login'))
+    # 로그인한 사용자는 메인 페이지로 리다이렉트
+    return redirect(url_for('crud.index'))
+
+@app.route('/start-stream')
+def start_stream():
+    thread = threading.Thread(target=run_pose_tracking)
+    thread.daemon = True
+    thread.start()
+    return redirect(url_for('crud.index'))
+
+def open_browser():
+    time.sleep(1)
+    webbrowser.open("http://localhost:5000")
+
 if __name__ == '__main__':
-    print("🚀 자세 분석 시스템을 시작합니다...")
-    print("📱 웹 브라우저에서 http://localhost:5000/auth/login 으로 접속하세요")
-    print("⏹️  종료하려면 Ctrl+C를 누르세요")
-    print("-" * 50)
-    
-    app.run(
-        host='0.0.0.0',
-        port=5000,
-        debug=True
-    ) 
+    threading.Thread(target=open_browser).start()
+    app.run(debug=True)

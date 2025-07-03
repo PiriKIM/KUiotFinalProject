@@ -6,7 +6,9 @@ from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
 def create_app():
-    app = Flask(__name__, static_folder='apps/crud/static')  # 플라스크 인스턴스 생성
+    # 현재 파일의 위치를 기준으로 static 폴더 경로 설정
+    static_folder_path = Path(__file__).parent / 'crud' / 'static'
+    app = Flask(__name__, static_folder=str(static_folder_path), static_url_path='/static')
 
     app.config.from_mapping(
         SECRET_KEY='9dghh4g510frf7g1dgf2h6d4g',

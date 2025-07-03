@@ -34,9 +34,11 @@ void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(false);
 
-  // 부저 핀 설정
+  // 부저 핀 초기화
   pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
 
+  // Wi-Fi 연결
   WiFi.begin(ssid, password);
   Serial.println("Wi-Fi 연결 중...");
   while (WiFi.status() != WL_CONNECTED) {
@@ -47,6 +49,7 @@ void setup() {
   Serial.print("🔗 접속 주소: http://");
   Serial.println(WiFi.localIP());
 
+  // 카메라 설정
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer   = LEDC_TIMER_0;
@@ -92,11 +95,26 @@ void setup() {
 }
 
 void loop() {
-  // 부저 3초 간격으로 0.3초 울림
-  digitalWrite(BUZZER_PIN, HIGH);
-  delay(300);
-  digitalWrite(BUZZER_PIN, LOW);
-  delay(2700);
+  static String serialBuffer = "";
+
+  // 시리얼 데이터 읽기
+  while (Serial.available()) {
+    char ch = Serial.read();
+    if (ch == '\n' || ch == '\r') {
+      if (serialBuffer == "aaa") {
+        Serial.println("🔔 부저 작동 (aaa 감지)");
+        digitalWrite(BUZZER_PIN, HIGH);
+        delay(300);
+        digitalWrite(BUZZER_PIN, LOW);
+      } else {
+        Serial.print("ℹ️ 입력된 문자열: ");
+        Serial.println(serialBuffer);
+      }
+      serialBuffer = "";  // 버퍼 초기화
+    } else {
+      serialBuffer += ch;
+    }
+  }
 }
 
 void startCameraServer() {
@@ -144,3 +162,4 @@ void startCameraServer() {
     Serial.println("❌ 스트림링 서버 시작 실패.");
   }
 }
+
