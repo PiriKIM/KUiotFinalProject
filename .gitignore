@@ -129,4 +129,8 @@ Thumbs.db
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp
+
+# Video files
+posture_video_20250705_223320.mp4
+posture_analysis_pipeline/posture_video_20250705_222943.mp4 
