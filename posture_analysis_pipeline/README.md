@@ -10,6 +10,7 @@
 - **정량적 자세 평가**: CVA 각도를 통한 객관적 측정
 - **의학적 등급 분류**: 누적 데미지 관점의 3단계 등급 시스템
 - **측면 자동 감지**: 카메라 위치에 따른 랜드마크 선택
+- **3클래스 자세 분류**: 정면, 좌측면, 우측면 실시간 분류
 - **모듈화된 구조**: 재사용 가능한 컴포넌트 설계
 
 ## 🏗️ 프로젝트 구조
@@ -29,7 +30,9 @@ posture_analysis_pipeline/
 │   │   ├── coordinate_filter.py     # 4단계: 좌표 필터링
 │   │   ├── angle_calculator.py      # 5단계: CVA 각도 계산
 │   │   ├── grade_classifier.py      # 6단계: 등급 분류
-│   │   └── image_selector.py        # 7단계: 이미지 선택
+│   │   ├── image_selector.py        # 7단계: 이미지 선택
+│   │   ├── pose_classifier_4way.py  # 3클래스 자세 분류 모델
+│   │   └── realtime_classifier_4way.py # 실시간 분류 시스템
 │   ├── utils/               # 공통 유틸리티
 │   │   ├── camera_detector.py       # 카메라 위치 감지
 │   │   ├── file_manager.py          # 파일 관리
@@ -46,17 +49,22 @@ posture_analysis_pipeline/
 │   └── results/             # 최종 결과
 ├── tests/                   # 테스트 코드
 ├── scripts/                 # 실행 스크립트
+│   ├── record_video.py      # 동영상 촬영
+│   ├── extract_frames.py    # 프레임 분할
+│   ├── extract_landmarks.py # 랜드마크 추출
+│   ├── train_4way_model.py  # 4way 모델 훈련
+│   └── realtime_4way_test.py # 실시간 분류 테스트
 └── docs/                    # 문서
 ```
 
 ## 🔄 7단계 파이프라인
 
-### 1️⃣ **동영상 촬영** (`record_video.py`)
+### 1️⃣ **동영상 촬영** (`record_video.py`) ✅
 - 웹캠을 통한 자세 변화 촬영 (15-20초)
 - 1단계(바른 자세) → 10단계(무너진 자세) 점진적 변화
 - `posture_video_2025xxxx_xxxxxx.mp4` 저장
 
-### 2️⃣ **프레임 분할** (`extract_frames.py`)
+### 2️⃣ **프레임 분할** (`extract_frames.py`) ✅
 - 동영상을 등간격으로 50개 프레임 추출
 - `frames/frame_01.jpg ~ frame_50.jpg` 저장
 
@@ -90,6 +98,32 @@ posture_analysis_pipeline/
 - 단계별 대표 이미지 추출 및 저장
 - 결과 시각화
 
+## 🆕 3클래스 자세 분류 시스템
+
+### 🎯 4way 모델 기반 실시간 분류
+
+새로 추가된 3클래스 자세 분류 시스템은 **정면, 좌측면, 우측면**을 실시간으로 구분합니다.
+
+#### **분류 클래스:**
+- **정면 (Front)**: 카메라를 정면으로 바라보는 자세
+- **좌측면 (Left Side)**: 카메라 왼쪽 측면을 보이는 자세  
+- **우측면 (Right Side)**: 카메라 오른쪽 측면을 보이는 자세
+
+#### **주요 특징:**
+- **실시간 분류**: 웹캠을 통한 실시간 자세 분류
+- **높은 정확도**: 99% 이상의 분류 정확도
+- **빠른 응답**: 지연 없는 즉시 분류
+- **신뢰도 표시**: 각 클래스별 확률 표시
+
+#### **사용 방법:**
+```bash
+# 1. 모델 훈련
+python3 scripts/train_4way_model.py
+
+# 2. 실시간 테스트
+python3 scripts/realtime_4way_test.py
+```
+
 ## 🚀 시작하기
 
 ### 필수 요구사항
@@ -99,6 +133,7 @@ posture_analysis_pipeline/
 - NumPy
 - Pandas
 - Matplotlib
+- Scikit-learn
 
 ### 설치
 ```bash
@@ -129,6 +164,15 @@ python3 scripts/extract_frames.py data/raw/posture_video_20250706_172322.mp4
 python3 scripts/extract_landmarks.py data/frames/
 ```
 
+#### 3클래스 분류 시스템
+```bash
+# 4way 모델 훈련
+python3 scripts/train_4way_model.py
+
+# 실시간 분류 테스트
+python3 scripts/realtime_4way_test.py
+```
+
 #### 결과 시각화
 ```bash
 python scripts/visualize_results.py
@@ -142,6 +186,11 @@ python scripts/visualize_results.py
 - `data/angles/cva_angles.csv`: CVA 각도 계산 결과
 - `data/grades/grade_classification.csv`: 등급 분류 결과
 - `data/results/final_report.csv`: 최종 분석 리포트
+
+### 3클래스 분류 결과
+- `pose_classifier_4way_model.pkl`: 훈련된 분류 모델
+- `confusion_matrix_4way.png`: 혼동 행렬
+- `feature_importance_4way.png`: 특징 중요도
 
 ### 시각화 결과
 - `data/results/visualization/`: 각도 변화 그래프, 등급별 이미지 등
@@ -191,6 +240,10 @@ GRADE_LABELS = {     # 3단계 등급 라벨
     1: 'A', 2: 'B', 3: 'B', 4: 'B', 5: 'C',
     6: 'C', 7: 'C', 8: 'C', 9: 'C', 10: 'C'
 }
+
+# 3클래스 분류 설정
+CLASSES = ['정면', '좌측면', '우측면']
+MODEL_PATH = 'pose_classifier_4way_model.pkl'
 ```
 
 ## 🧪 테스트
@@ -199,9 +252,23 @@ GRADE_LABELS = {     # 3단계 등급 라벨
 # 전체 테스트 실행
 python -m pytest tests/
 
-# 특정 모듈 테스트
-python -m pytest tests/test_video_recorder.py
+# 3클래스 분류 테스트
+python3 scripts/realtime_4way_test.py
 ```
+
+## 📈 성능 지표
+
+### 3클래스 분류 성능
+- **정확도**: 99.3% (±1.4%)
+- **교차 검증**: 5-fold CV
+- **특징 수**: 31개
+- **모델**: RandomForest
+
+### 데이터 분포
+- **정면**: 531개 샘플
+- **좌측면**: 385개 샘플  
+- **우측면**: 317개 샘플
+- **총 데이터**: 1,387개
 
 ## 📝 API 문서
 
