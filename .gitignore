@@ -131,6 +131,11 @@ Thumbs.db
 *.tmp
 *.temp
 
-# Video files
-posture_video_20250705_223320.mp4
-posture_analysis_pipeline/posture_video_20250705_222943.mp4 
+# 자세 분석 파이프라인 - 대용량 파일들
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.flv
+*.wmv
+posture_analysis_pipeline/frames_posture_video_20250706_173222/
