@@ -51,20 +51,20 @@ posture_analysis_pipeline/
 
 ## 🔄 7단계 파이프라인
 
-### 1️⃣ **동영상 촬영** (`video_recorder.py`)
+### 1️⃣ **동영상 촬영** (`record_video.py`)
 - 웹캠을 통한 자세 변화 촬영 (15-20초)
 - 1단계(바른 자세) → 10단계(무너진 자세) 점진적 변화
-- `video.mp4` 저장
+- `posture_video_2025xxxx_xxxxxx.mp4` 저장
 
-### 2️⃣ **프레임 분할** (`frame_extractor.py`)
+### 2️⃣ **프레임 분할** (`extract_frames.py`)
 - 동영상을 등간격으로 50개 프레임 추출
 - `frames/frame_01.jpg ~ frame_50.jpg` 저장
 
-### 3️⃣ **랜드마크 추출** (`landmark_extractor.py`)
+### 3️⃣ **랜드마크 추출** (`extract_landmarks.py`) ✅
 - MediaPipe Pose로 랜드마크 추출
 - 카메라 위치 자동 감지 (왼쪽/오른쪽 측면)
 - 측면별 랜드마크 선택 (LEFT_XXX / RIGHT_XXX)
-- CSV 저장: 피사체ID, 프레임명, 좌표값, 카메라 위치
+- CSV/JSON 저장: 피사체ID, 프레임명, 좌표값, 카메라 위치
 
 ### 4️⃣ **좌표 필터링** (`coordinate_filter.py`)
 - 카메라 위치에 따른 측면별 좌표 선택
@@ -119,7 +119,14 @@ python scripts/run_full_pipeline.py
 
 #### 단계별 실행
 ```bash
-python scripts/run_step_by_step.py
+# 1단계: 동영상 촬영
+python3 scripts/record_video.py
+
+# 2단계: 프레임 분할
+python3 scripts/extract_frames.py data/raw/posture_video_20250706_172322.mp4
+
+# 3단계: 랜드마크 추출
+python3 scripts/extract_landmarks.py data/frames/
 ```
 
 #### 결과 시각화
