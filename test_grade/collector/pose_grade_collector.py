@@ -27,7 +27,7 @@ def get_korean_font(font_size=20):
     global _global_font, _font_loaded
     
     if _font_loaded and _global_font:
-        return _global_font
+        return _global_font 
     
     # 한글 폰트 로드 (여러 폰트 경로 시도)
     font_paths = [

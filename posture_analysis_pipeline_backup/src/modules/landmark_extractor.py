@@ -234,29 +234,43 @@ class LandmarkExtractor:
         return extracted_data
     
     def save_to_csv(self, data: List[Dict], output_dir: Path):
-        """랜드마크 데이터를 CSV 파일로 저장"""
+        """랜드마크 데이터를 CSV 파일로 저장 (merged.csv와 동일한 구조)"""
         try:
             # CSV 데이터 준비
             csv_rows = []
             
             for item in data:
-                subject_id = item['subject_id']
-                frame_name = item['frame_name']
-                camera_position = item['camera_position']
+                # 기본 정보 설정
+                row = {
+                    'id': '',  # 빈 값으로 설정 (나중에 채울 수 있음)
+                    'timestamp': item.get('extraction_time', ''),
+                    'participant_id': item['subject_id'],
+                    'view_angle': item.get('camera_position', ''),
+                    'pose_grade': '',  # 빈 값으로 설정
+                    'auto_grade': '',  # 빈 값으로 설정
+                    'neck_angle': '',  # 빈 값으로 설정
+                    'spine_angle': '',  # 빈 값으로 설정
+                    'shoulder_asymmetry': '',  # 빈 값으로 설정
+                    'pelvic_tilt': '',  # 빈 값으로 설정
+                    'total_score': '',  # 빈 값으로 설정
+                    'analysis_results': '',  # 빈 값으로 설정
+                }
                 
-                for landmark in item['landmarks']:
-                    row = {
-                        'subject_id': subject_id,
-                        'frame_name': frame_name,
-                        'camera_position': camera_position,
-                        'landmark_id': landmark['landmark_id'],
-                        'landmark_name': landmark['landmark_name'],
-                        'x': landmark['x'],
-                        'y': landmark['y'],
-                        'z': landmark['z'],
-                        'visibility': landmark['visibility']
-                    }
-                    csv_rows.append(row)
+                # 랜드마크 좌표 추가 (0부터 32까지)
+                for i in range(33):
+                    landmark = next((lm for lm in item['landmarks'] if lm['landmark_id'] == i), None)
+                    if landmark:
+                        row[f'landmark_{i}_x'] = landmark['x']
+                        row[f'landmark_{i}_y'] = landmark['y']
+                    else:
+                        row[f'landmark_{i}_x'] = ''
+                        row[f'landmark_{i}_y'] = ''
+                
+                # 추가 정보
+                row['name'] = item['frame_name']
+                row['seq'] = ''  # 빈 값으로 설정
+                
+                csv_rows.append(row)
             
             # DataFrame 생성 및 저장
             df = pd.DataFrame(csv_rows)
@@ -264,6 +278,8 @@ class LandmarkExtractor:
             df.to_csv(csv_path, index=False, encoding='utf-8')
             
             print(f"📄 CSV 파일 저장 완료: {csv_path}")
+            print(f"📊 생성된 행 수: {len(csv_rows)}")
+            print(f"📋 컬럼 수: {len(df.columns)}")
             
         except Exception as e:
             print(f"CSV 저장 오류: {e}")

@@ -72,6 +72,14 @@ def main():
         print(f"  - CSV: {output_path / 'raw_landmarks.csv'}")
         print(f"  - JSON: {output_path / 'raw_landmarks.json'}")
         
+        # CSV 구조 정보
+        print(f"📋 CSV 구조:")
+        print(f"  - merged.csv와 동일한 컬럼 구조 사용")
+        print(f"  - 기본 정보: id, timestamp, participant_id, view_angle, pose_grade, auto_grade, neck_angle, spine_angle, shoulder_asymmetry, pelvic_tilt, total_score, analysis_results")
+        print(f"  - 랜드마크 좌표: landmark_0_x, landmark_0_y ~ landmark_32_x, landmark_32_y")
+        print(f"  - 추가 정보: name, seq")
+        print(f"  - 분석 관련 컬럼들은 빈 값으로 설정 (나중에 분석 단계에서 채워짐)")
+        
     else:
         print("❌ 랜드마크 추출 실패")
         return 1
