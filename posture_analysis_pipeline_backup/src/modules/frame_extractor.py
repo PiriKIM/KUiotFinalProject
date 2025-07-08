@@ -127,6 +127,133 @@ class FrameExtractor:
         logger.info(f"프레임 추출 완료: {len(saved_frames)}개 프레임 저장")
         return saved_frames
     
+    def extract_frames_with_time_range(self, video_path: str, output_dir: str | None = None, 
+                                      num_frames: int = 50, start_time: float | None = None, 
+                                      end_time: float | None = None) -> List[str]:
+        """
+        지정된 시간 구간에서 동영상 프레임 추출
+        
+        Args:
+            video_path: 동영상 파일 경로
+            output_dir: 출력 디렉토리 (기본값: 자동 생성)
+            num_frames: 추출할 프레임 수 (기본값: 50)
+            start_time: 시작 시간 (초, 기본값: 0초)
+            end_time: 끝 시간 (초, 기본값: 동영상 끝)
+            
+        Returns:
+            저장된 프레임 파일 경로 리스트
+        """
+        # 파일 존재 확인
+        if not Path(video_path).exists():
+            logger.error(f"동영상 파일을 찾을 수 없습니다: {video_path}")
+            return []
+        
+        # 출력 디렉토리 설정
+        if output_dir is None:
+            video_name = Path(video_path).stem
+            output_dir = f"frames_{video_name}"
+        
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        logger.info(f"프레임 추출 시작: {video_path}")
+        logger.info(f"출력 디렉토리: {output_path}")
+        logger.info(f"추출할 프레임 수: {num_frames}")
+        
+        # 동영상 파일 열기
+        self.cap = cv2.VideoCapture(video_path)
+        
+        if not self.cap.isOpened():
+            logger.error("동영상 파일을 열 수 없습니다.")
+            return []
+        
+        # 동영상 정보 가져오기
+        total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = self.cap.get(cv2.CAP_PROP_FPS)
+        duration = total_frames / fps if fps > 0 else 0
+        
+        logger.info(f"동영상 정보: {total_frames}프레임, {fps:.1f}fps, {duration:.1f}초")
+        
+        # 시간 구간 설정
+        if start_time is None:
+            start_time = 0.0
+        if end_time is None:
+            end_time = duration
+        
+        # 시간을 프레임 인덱스로 변환
+        start_frame = int(start_time * fps)
+        end_frame = int(end_time * fps)
+        
+        # 경계 검증
+        start_frame = max(0, min(start_frame, total_frames - 1))
+        end_frame = max(start_frame + 1, min(end_frame, total_frames))
+        
+        logger.info(f"시간 구간: {start_time:.1f}초 ~ {end_time:.1f}초")
+        logger.info(f"프레임 구간: {start_frame} ~ {end_frame} (총 {end_frame - start_frame}프레임)")
+        
+        # 구간 내 프레임 수 계산
+        available_frames = end_frame - start_frame
+        
+        if available_frames <= 0:
+            logger.error("유효한 프레임 구간이 없습니다.")
+            self.release()
+            return []
+        
+        # 프레임 간격 계산
+        if available_frames <= num_frames:
+            # 구간 내 프레임이 요청한 프레임 수보다 적으면 모든 프레임 추출
+            frame_indices = list(range(start_frame, end_frame))
+            logger.info(f"구간 내 프레임이 {num_frames}개보다 적어서 모든 프레임을 추출합니다.")
+        else:
+            # 등간격으로 프레임 인덱스 계산
+            frame_indices = [start_frame + int(i * available_frames / num_frames) for i in range(num_frames)]
+            # 마지막 프레임이 구간을 벗어나지 않도록 조정
+            if frame_indices[-1] >= end_frame:
+                frame_indices[-1] = end_frame - 1
+        
+        logger.info(f"추출할 프레임 인덱스: {frame_indices[:5]}...{frame_indices[-5:]}")
+        
+        # 프레임 추출 및 저장
+        saved_frames = []
+        current_frame = 0
+        
+        try:
+            for i, frame_index in enumerate(frame_indices):
+                # 해당 프레임으로 이동
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
+                
+                # 프레임 읽기
+                ret, frame = self.cap.read()
+                if not ret:
+                    logger.warning(f"프레임 {frame_index}를 읽을 수 없습니다.")
+                    continue
+                
+                # 프레임 번호 포맷팅 (01, 02, ..., 50)
+                frame_number = i + 1
+                frame_filename = f"frame_{frame_number:02d}.jpg"
+                frame_path = output_path / frame_filename
+                
+                # 프레임 저장
+                success = cv2.imwrite(str(frame_path), frame)
+                if success:
+                    saved_frames.append(str(frame_path))
+                    frame_time = frame_index / fps
+                    logger.info(f"프레임 저장 완료: {frame_filename} (원본 프레임: {frame_index}, 시간: {frame_time:.1f}초)")
+                else:
+                    logger.error(f"프레임 저장 실패: {frame_filename}")
+                
+                current_frame += 1
+        
+        except Exception as e:
+            logger.error(f"프레임 추출 중 오류 발생: {e}")
+        
+        finally:
+            # 리소스 해제
+            self.release()
+        
+        logger.info(f"프레임 추출 완료: {len(saved_frames)}개 프레임 저장")
+        return saved_frames
+    
     def get_video_info(self, video_path: str) -> Tuple[int, float, float]:
         """
         동영상 정보 가져오기
