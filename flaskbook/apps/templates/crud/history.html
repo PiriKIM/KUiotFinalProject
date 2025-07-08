@@ -1,362 +1,78 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>분석 기록 - {{ user.username }}</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Arial', sans-serif;
-            background: #f5f5f5;
-        }
-        
-        .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .navbar-brand {
-            font-size: 20px;
-            font-weight: bold;
-        }
-        
-        .navbar-nav {
-            display: flex;
-            list-style: none;
-            gap: 20px;
-        }
-        
-        .navbar-nav a {
-            color: white;
-            text-decoration: none;
-            padding: 8px 12px;
-            border-radius: 5px;
-            transition: background-color 0.3s;
-        }
-        
-        .navbar-nav a:hover {
-            background-color: rgba(255,255,255,0.2);
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .page-header {
-            background: white;
-            border-radius: 10px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .page-title {
-            font-size: 28px;
-            color: #333;
-            margin-bottom: 10px;
-        }
-        
-        .page-subtitle {
-            color: #666;
-        }
-        
-        .records-container {
-            background: white;
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .record-card {
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 15px;
-            transition: box-shadow 0.3s ease;
-        }
-        
-        .record-card:hover {
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        
-        .record-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .record-date {
-            font-size: 16px;
-            font-weight: bold;
-            color: #333;
-        }
-        
-        .record-score {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .score-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: #667eea;
-        }
-        
-        .grade-badge {
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: bold;
-            color: white;
-        }
-        
-        .grade-a { background-color: #28a745; }
-        .grade-b { background-color: #17a2b8; }
-        .grade-c { background-color: #ffc107; }
-        .grade-d { background-color: #dc3545; }
-        
-        .record-details {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-        }
-        
-        .detail-item {
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 6px;
-        }
-        
-        .detail-label {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-            font-weight: 500;
-        }
-        
-        .detail-value {
-            font-size: 14px;
-            color: #333;
-            font-weight: 500;
-        }
-        
-        .detail-value.good {
-            color: #28a745;
-        }
-        
-        .detail-value.warning {
-            color: #ffc107;
-        }
-        
-        .detail-value.bad {
-            color: #dc3545;
-        }
-        
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            margin-top: 30px;
-        }
-        
-        .pagination a, .pagination span {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            text-decoration: none;
-            color: #333;
-            transition: all 0.3s ease;
-        }
-        
-        .pagination a:hover {
-            background-color: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-        
-        .pagination .current {
-            background-color: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-        
-        .pagination .disabled {
-            color: #999;
-            cursor: not-allowed;
-        }
-        
-        .no-records {
-            text-align: center;
-            padding: 60px 20px;
-            color: #666;
-        }
-        
-        .no-records h3 {
-            margin-bottom: 15px;
-            color: #333;
-        }
-        
-        .no-records p {
-            margin-bottom: 20px;
-        }
-        
-        .start-analysis-btn {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: transform 0.2s ease;
-        }
-        
-        .start-analysis-btn:hover {
-            transform: translateY(-2px);
-        }
-        
-        @media (max-width: 768px) {
-            .record-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
-            
-            .record-details {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>분석 기록 - 자세 분석 시스템</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f8f9fa; }
+    .main-container { max-width: 1200px; margin: 20px auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); padding: 32px; }
+  </style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="navbar-brand">자세 분석 시스템</div>
-        <ul class="navbar-nav">
-            <li><a href="{{ url_for('crud.index') }}">분석</a></li>
-            <li><a href="{{ url_for('crud.history') }}">기록</a></li>
-            <li><a href="{{ url_for('crud.statistics') }}">통계</a></li>
-            <li><a href="{{ url_for('auth.profile') }}">프로필</a></li>
-            <li><a href="{{ url_for('auth.logout') }}">로그아웃</a></li>
-        </ul>
-    </nav>
-
-    <div class="container">
-        <div class="page-header">
-            <h1 class="page-title">분석 기록</h1>
-            <p class="page-subtitle">{{ user.username }}님의 자세 분석 기록입니다.</p>
-        </div>
-        
-        <div class="records-container">
-            {% if records.items %}
-                {% for record in records.items %}
-                    <div class="record-card">
-                        <div class="record-header">
-                            <div class="record-date">
-                                {{ record.analysis_date.strftime('%Y년 %m월 %d일 %H:%M') }}
-                            </div>
-                            <div class="record-score">
-                                <span class="score-number">{{ record.calculate_overall_score() }}</span>
-                                <span class="grade-badge grade-{{ record.calculate_overall_grade().lower() }}">
-                                    {{ record.calculate_overall_grade() }}
-                                </span>
-                            </div>
-                        </div>
-                        
-                        <div class="record-details">
-                            <div class="detail-item">
-                                <div class="detail-label">목 자세</div>
-                                <div class="detail-value {% if record.neck_grade in ['A', 'B'] %}good{% elif record.neck_grade == 'C' %}warning{% else %}bad{% endif %}">
-                                    {{ record.neck_description }} ({{ "%.1f"|format(record.neck_angle) }}°)
-                                </div>
-                            </div>
-                            
-                            <div class="detail-item">
-                                <div class="detail-label">척추 곡률</div>
-                                <div class="detail-value {% if not record.spine_is_hunched %}good{% else %}bad{% endif %}">
-                                    {% if record.spine_is_hunched %}굽음{% else %}정상{% endif %}
-                                </div>
-                            </div>
-                            
-                            <div class="detail-item">
-                                <div class="detail-label">어깨 비대칭</div>
-                                <div class="detail-value {% if not record.shoulder_is_asymmetric %}good{% else %}bad{% endif %}">
-                                    {% if record.shoulder_is_asymmetric %}비대칭{% else %}정상{% endif %}
-                                </div>
-                            </div>
-                            
-                            <div class="detail-item">
-                                <div class="detail-label">골반 기울기</div>
-                                <div class="detail-value {% if not record.pelvic_is_tilted %}good{% else %}bad{% endif %}">
-                                    {% if record.pelvic_is_tilted %}기울어짐{% else %}정상{% endif %}
-                                </div>
-                            </div>
-                            
-                            <div class="detail-item">
-                                <div class="detail-label">척추 틀어짐</div>
-                                <div class="detail-value {% if not record.spine_is_twisted %}good{% else %}bad{% endif %}">
-                                    {% if record.spine_is_twisted %}있음{% else %}정상{% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                {% endfor %}
-                
-                <!-- 페이지네이션 -->
-                {% if records.pages > 1 %}
-                    <div class="pagination">
-                        {% if records.has_prev %}
-                            <a href="{{ url_for('crud.history', page=records.prev_num) }}">&laquo; 이전</a>
-                        {% else %}
-                            <span class="disabled">&laquo; 이전</span>
-                        {% endif %}
-                        
-                        {% for page_num in records.iter_pages() %}
-                            {% if page_num %}
-                                {% if page_num != records.page %}
-                                    <a href="{{ url_for('crud.history', page=page_num) }}">{{ page_num }}</a>
-                                {% else %}
-                                    <span class="current">{{ page_num }}</span>
-                                {% endif %}
-                            {% else %}
-                                <span>...</span>
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% if records.has_next %}
-                            <a href="{{ url_for('crud.history', page=records.next_num) }}">다음 &raquo;</a>
-                        {% else %}
-                            <span class="disabled">다음 &raquo;</span>
-                        {% endif %}
-                    </div>
-                {% endif %}
-                
-            {% else %}
-                <div class="no-records">
-                    <h3>아직 분석 기록이 없습니다</h3>
-                    <p>자세 분석을 시작하여 첫 번째 기록을 만들어보세요!</p>
-                    <a href="{{ url_for('crud.index') }}" class="start-analysis-btn">자세 분석 시작하기</a>
-                </div>
-            {% endif %}
-        </div>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/crud/">자세 분석 시스템</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item"><a class="nav-link" href="/crud/">분석</a></li>
+        <li class="nav-item"><a class="nav-link active" href="/crud/history">기록</a></li>
+        <li class="nav-item"><a class="nav-link" href="/crud/statistics">통계</a></li>
+        <li class="nav-item"><a class="nav-link" href="/crud/profile">프로필</a></li>
+      </ul>
+      <ul class="navbar-nav mb-2 mb-lg-0">
+        <li class="nav-item"><a class="nav-link" href="/auth/login">로그인</a></li>
+        <li class="nav-item"><a class="nav-link" href="/auth/register">회원가입</a></li>
+      </ul>
     </div>
+  </div>
+</nav>
+<div class="main-container">
+  <h2 class="mb-4">분석 기록</h2>
+  <div class="table-responsive">
+    <table class="table table-striped table-hover">
+      <thead class="table-dark">
+        <tr>
+          <th>날짜</th>
+          <th>시간</th>
+          <th>자세 점수</th>
+          <th>상태</th>
+          <th>상세보기</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in records %}
+        <tr>
+          <td>{{ record.date }}</td>
+          <td>{{ record.time }}</td>
+          <td>
+            <span class="badge {% if record.score >= 80 %}bg-success{% elif record.score >= 60 %}bg-warning{% else %}bg-danger{% endif %}">
+              {{ record.score }}점
+            </span>
+          </td>
+          <td>{{ record.status }}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary" onclick="viewDetails({{ record.id }})">상세보기</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if not records %}
+  <div class="text-center py-5">
+    <p class="text-muted">아직 분석 기록이 없습니다.</p>
+    <a href="/crud/" class="btn btn-primary">첫 분석 시작하기</a>
+  </div>
+  {% endif %}
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function viewDetails(recordId) {
+  // 상세보기 기능 구현
+  console.log('상세보기:', recordId);
+}
+</script>
 </body>
 </html> 

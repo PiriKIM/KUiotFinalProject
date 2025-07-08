@@ -85,10 +85,8 @@ class PostureAnalyzer:
             return 'A', "완벽한 자세"
         elif neck_angle <= 10:
             return 'B', "양호한 자세"
-        elif neck_angle <= 15:
-            return 'C', "보통 자세"
         else:
-            return 'D', "나쁜 자세"
+            return 'C', "나쁜 자세"
     
     def analyze_average_posture(self, landmark_batches):
         """

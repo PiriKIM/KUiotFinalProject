@@ -70,8 +70,8 @@ class PostureRecord(db.Model):
             score -= 10
         elif self.neck_grade == 'C':
             score -= 20
-        else:  # D
-            score -= 30
+        else:  # D (이전)
+            score -= 30  # D도 C로 통합
         
         # 척추 곡률 점수 (25점)
         if self.spine_is_hunched:
@@ -98,7 +98,5 @@ class PostureRecord(db.Model):
             return 'A'
         elif score >= 70:
             return 'B'
-        elif score >= 50:
-            return 'C'
         else:
-            return 'D'
+            return 'C'

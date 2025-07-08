@@ -6,6 +6,9 @@ from .models import User, PostureRecord, db
 import mediapipe as mp
 from datetime import datetime, timedelta
 import time
+import subprocess
+import threading
+
 
 crud = Blueprint(
     'crud',
@@ -15,6 +18,11 @@ crud = Blueprint(
 )
 
 analyzer = PostureAnalyzer()
+
+# ESP32 부저 제어 설정
+ESP32_IP = "192.168.0.102"  # ESP32 IP 주소
+ESP32_PORT = 81
+ESP32_BUZZER_URL = f"http://{ESP32_IP}:{ESP32_PORT}/buzzer"
 
 # 상태 관리 클래스 (ESP32-CAM 전용으로 단순화)
 class ESP32PoseStateManager:
@@ -141,6 +149,149 @@ class ESP32PoseStateManager:
 # 전역 상태 관리자 인스턴스
 state_manager = ESP32PoseStateManager()
 
+# 자세 분석 상태 관리
+class PostureBuzzerManager:
+    def __init__(self):
+        self.bad_posture_count = 0
+        self.good_posture_count = 0
+        self.last_buzzer_time = 0
+        self.buzzer_cooldown = 5  # 5초 쿨다운
+        self.bad_posture_threshold = 3  # 3번 연속 나쁜 자세 감지시 부저
+        self.good_posture_reset = 5  # 5번 연속 좋은 자세시 카운터 리셋
+        self.buzzer_enabled = True  # 부저 기능 활성화/비활성화
+        self.esp32_connected = False  # ESP32 연결 상태
+        self.last_connection_check = 0  # 마지막 연결 확인 시간
+        self.connection_check_interval = 3  # 3초마다 연결 확인 (더 빠른 응답)
+    
+    def trigger_buzzer(self, action='trigger', volume=None):
+        """ESP32 부저 제어 (trigger 및 볼륨 조정 지원)"""
+        if not self.buzzer_enabled:
+            print(f"🔕 부저 비활성화 상태: {action} 명령 무시")
+            return False
+        
+        # URL 구성
+        if action == 'volume' and volume is not None:
+            url = f"{ESP32_BUZZER_URL}?action={action}&value={volume}"
+            print(f"🌐 ESP32 볼륨 요청: {url}")
+        elif action == 'trigger':
+            url = f"{ESP32_BUZZER_URL}?action={action}"
+            print(f"🌐 ESP32 부저 울림 요청: {url}")
+        else:
+            print(f"🔕 지원하지 않는 명령: {action}")
+            return False
+        
+        # curl 명령어로 직접 요청 (재시도 로직 포함)
+        import subprocess
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"🔄 ESP32 요청 시도 {attempt + 1}/{max_retries}")
+                start_time = time.time()
+                
+                # curl 명령어 구성
+                cmd = ['curl', '-s', '--connect-timeout', '5', url]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+                end_time = time.time()
+                
+                if result.returncode == 0 and result.stdout:
+                    print(f"📡 ESP32 응답: 200 - {result.stdout.strip()} (응답시간: {end_time-start_time:.2f}초)")
+                    if action == 'volume':
+                        print(f"🔔 ESP32 볼륨 설정 성공: {volume}%")
+                    else:
+                        print(f"🔔 ESP32 부저 울림 성공!")
+                    return True
+                else:
+                    print(f"❌ ESP32 요청 실패: {result.stderr}")
+                    if attempt < max_retries - 1:
+                        print(f"⏳ 1초 후 재시도...")
+                        time.sleep(1)
+                    continue
+                    
+            except subprocess.TimeoutExpired:
+                print(f"❌ ESP32 요청 타임아웃 (8초) - 시도 {attempt + 1}/{max_retries}")
+                if attempt < max_retries - 1:
+                    print(f"⏳ 2초 후 재시도...")
+                    time.sleep(2)
+                continue
+            except Exception as e:
+                print(f"❌ ESP32 요청 오류: {e} - 시도 {attempt + 1}/{max_retries}")
+                if attempt < max_retries - 1:
+                    print(f"⏳ 1초 후 재시도...")
+                    time.sleep(1)
+                continue
+        
+        print(f"❌ ESP32 요청 최종 실패 ({max_retries}회 시도)")
+        return False
+    
+    def trigger_buzzer_async(self, action='trigger', volume=None):
+        """비동기 부저 제어 (제거됨)"""
+        # 부저 기능 제거됨
+        print(f"🔔 부저 제어 호출됨: action={action}, volume={volume} (기능 제거됨)")
+        return False
+    
+    def check_esp32_connection(self):
+        """ESP32 연결 상태 확인 (제거됨)"""
+        current_time = time.time()
+        if current_time - self.last_connection_check < self.connection_check_interval:
+            return self.esp32_connected  # 캐시된 상태 반환
+        
+        # ESP32 연결 확인 기능 제거됨
+        self.esp32_connected = False
+        self.last_connection_check = current_time
+        return self.esp32_connected
+    
+    def check_posture_and_buzzer(self, posture_result):
+        """자세 분석 결과에 따른 부저 제어 (등급별)"""
+        if not self.buzzer_enabled:
+            return False
+            
+        current_grade = posture_result.get('grade', 'A')
+        current_score = posture_result.get('score', 100)
+        
+        # 이전 등급과 비교
+        if not hasattr(self, 'last_grade'):
+            self.last_grade = current_grade
+            self.last_score = current_score
+            return False
+        
+        # 등급이 바뀌었는지 확인
+        grade_changed = (self.last_grade != current_grade)
+        score_dropped = (self.last_score - current_score > 10)  # 10점 이상 하락
+        
+        # 등급 업데이트
+        self.last_grade = current_grade
+        self.last_score = current_score
+        
+        # 등급별 부저 울림 조건 (더 적극적으로)
+        if current_grade in ['C', 'D', 'F'] or score_dropped:
+            # ESP32 연결 상태 확인
+            if not self.check_esp32_connection():
+                print("⚠️ ESP32 연결되지 않음 - 부저 제어 건너뜀")
+                return False
+            
+            print(f"🚨 나쁜 자세 등급 감지: {current_grade} (점수: {current_score})")
+            self.trigger_buzzer_async('trigger')  # 비동기로 변경
+            return True
+        elif current_grade == 'B' and (grade_changed or score_dropped):
+            # ESP32 연결 상태 확인
+            if not self.check_esp32_connection():
+                print("⚠️ ESP32 연결되지 않음 - 부저 제어 건너뜀")
+                return False
+            
+            print(f"⚠️ 주의 자세 등급: {current_grade} (점수: {current_score})")
+            self.trigger_buzzer_async('trigger')  # 비동기로 변경
+            return True
+        elif current_grade == 'A' and grade_changed:
+            print(f"✅ 좋은 자세로 개선: {current_grade} (점수: {current_score})")
+            # A등급으로 개선된 경우는 부저 울리지 않음
+            return False
+        
+        return False
+
+# 전역 부저 관리자 인스턴스
+buzzer_manager = PostureBuzzerManager()
+
 def login_required(f):
     """로그인 필요 데코레이터"""
     def decorated_function(*args, **kwargs):
@@ -218,6 +369,14 @@ def analyze():
                 
                 print(f"계산된 점수: {posture_record.overall_score}, 등급: {posture_record.overall_grade}")
                 
+                # 자세 등급에 따른 부저 제어
+                posture_result = {
+                    'grade': posture_record.overall_grade,
+                    'neck_angle': neck_result['neck_angle'],
+                    'score': posture_record.overall_score
+                }
+                buzzer_triggered = buzzer_manager.check_posture_and_buzzer(posture_result)
+                
                 try:
                     db.session.add(posture_record)
                     db.session.commit()
@@ -236,7 +395,10 @@ def analyze():
                     'pelvic': pelvic_result,
                     'twist': twist_result,
                     'overall_score': posture_record.overall_score,
-                    'overall_grade': posture_record.overall_grade
+                    'overall_grade': posture_record.overall_grade,
+                    'buzzer_triggered': buzzer_triggered,
+                    'bad_posture_count': buzzer_manager.bad_posture_count,
+                    'good_posture_count': buzzer_manager.good_posture_count
                 }
                 print(f"응답 데이터: {response_data}")
                 return jsonify(response_data)
@@ -273,6 +435,12 @@ def history():
     return render_template('crud/history.html', 
                          user=user, 
                          records=records)
+
+@crud.route('/buzzer-test')
+@login_required
+def buzzer_test():
+    """부저 테스트 페이지"""
+    return render_template('crud/buzzer_test.html')
 
 @crud.route('/statistics')
 @login_required
@@ -316,3 +484,127 @@ def statistics():
                          grade_counts=grade_counts,
                          recent_avg=recent_avg,
                          monthly_stats=monthly_stats)
+
+@crud.route('/api/buzzer', methods=['GET', 'POST'])
+@login_required
+def buzzer_control():
+    """ESP32 부저 제어 API"""
+    action = request.args.get('action', 'status')
+    
+    if action == 'status':
+        return jsonify({
+            'enabled': buzzer_manager.buzzer_enabled,
+            'bad_posture_count': buzzer_manager.bad_posture_count,
+            'good_posture_count': buzzer_manager.good_posture_count,
+            'threshold': buzzer_manager.bad_posture_threshold,
+            'cooldown': buzzer_manager.buzzer_cooldown
+        })
+    
+    elif action == 'trigger':
+        success = buzzer_manager.trigger_buzzer('trigger')
+        return jsonify({'success': success, 'action': 'trigger'})
+    
+    elif action == 'test':
+        success = buzzer_manager.trigger_buzzer('test')
+        return jsonify({'success': success, 'action': 'test'})
+    
+    elif action == 'on':
+        success = buzzer_manager.trigger_buzzer('on')
+        return jsonify({'success': success, 'action': 'on'})
+    
+    elif action == 'off':
+        success = buzzer_manager.trigger_buzzer('off')
+        return jsonify({'success': success, 'action': 'off'})
+    
+    elif action == 'enable':
+        buzzer_manager.buzzer_enabled = True
+        return jsonify({'success': True, 'enabled': True})
+    
+    elif action == 'disable':
+        buzzer_manager.buzzer_enabled = False
+        return jsonify({'success': True, 'enabled': False})
+    
+    elif action == 'reset':
+        buzzer_manager.bad_posture_count = 0
+        buzzer_manager.good_posture_count = 0
+        return jsonify({'success': True, 'message': '카운터 리셋됨'})
+    
+    elif action == 'volume+':
+        success = buzzer_manager.trigger_buzzer('volume+')
+        return jsonify({'success': success, 'action': 'volume+'})
+    
+    elif action == 'volume-':
+        success = buzzer_manager.trigger_buzzer('volume-')
+        return jsonify({'success': success, 'action': 'volume-'})
+    
+    elif action == 'volume':
+        volume = request.args.get('value', type=int)
+        if volume is not None:
+            success = buzzer_manager.trigger_buzzer('volume', volume)
+            return jsonify({'success': success, 'action': 'volume', 'value': volume})
+        else:
+            return jsonify({'error': 'Volume value required'}), 400
+    
+    else:
+        return jsonify({'error': 'Invalid action'}), 400
+
+@crud.route('/api/buzzer/settings', methods=['POST'])
+@login_required
+def buzzer_settings():
+    """부저 설정 변경 API"""
+    data = request.get_json()
+    
+    if 'threshold' in data:
+        buzzer_manager.bad_posture_threshold = int(data['threshold'])
+    
+    if 'cooldown' in data:
+        buzzer_manager.buzzer_cooldown = int(data['cooldown'])
+    
+    if 'enabled' in data:
+        buzzer_manager.buzzer_enabled = bool(data['enabled'])
+    
+    return jsonify({
+        'success': True,
+        'threshold': buzzer_manager.bad_posture_threshold,
+        'cooldown': buzzer_manager.buzzer_cooldown,
+        'enabled': buzzer_manager.buzzer_enabled
+    })
+
+@crud.route('/api/buzzer/trigger', methods=['POST'])
+@login_required
+def trigger_buzzer_now():
+    """즉시 부저 울리기 (독립적인 컨트롤러 사용)"""
+    try:
+        success = buzzer_client.trigger_buzzer()
+        return jsonify({
+            'status': 'success' if success else 'error',
+            'message': '부저 울림 성공!' if success else '부저 울림 실패'
+        })
+    except Exception as e:
+        print(f"❌ 부저 제어 오류: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@crud.route('/api/buzzer/volume', methods=['POST'])
+@login_required
+def set_buzzer_volume():
+    """부저 볼륨 설정 (독립적인 컨트롤러 사용)"""
+    try:
+        data = request.get_json()
+        volume = data.get('volume', 50)
+        
+        success = buzzer_client.set_volume(volume)
+        
+        return jsonify({
+            'status': 'success' if success else 'error',
+            'message': f'볼륨 {volume}% 설정 완료' if success else '볼륨 설정 실패',
+            'volume': volume
+        })
+    except Exception as e:
+        print(f"❌ 볼륨 설정 오류: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500

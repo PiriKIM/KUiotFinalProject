@@ -25,7 +25,7 @@ def esp32_proxy():
     try:
         # ESP32-CAM에서 스트림 가져오기 (GET 요청 사용)
         print("ESP32-CAM에 연결 시도 중...")
-        response = requests.get('http://192.168.0.99:81/stream', 
+        response = requests.get('http://192.168.0.102:81/stream', 
                               timeout=30,  # 타임아웃 30초로 증가
                               stream=True,
                               headers={
@@ -129,7 +129,7 @@ def open_browser():
 
 if __name__ == '__main__':
     print("🚀 ESP32-CAM 자세 분석 시스템 시작")
-    print("📡 ESP32-CAM IP 주소: 192.168.0.99")
+    print("📡 ESP32-CAM IP 주소: 192.168.0.102")
     print("🌐 브라우저에서 http://localhost:5000 접속")
     print("🔄 프록시 엔드포인트: http://localhost:5000/esp32-stream")
     threading.Thread(target=open_browser).start()
