@@ -1,0 +1,78 @@
+{
+  "total_frames": 50,
+  "min_angle": -24.565219252891666,
+  "max_angle": -4.5484774659798575,
+  "min_abs_angle": 4.5484774659798575,
+  "max_abs_angle": 24.565219252891666,
+  "mean_angle": -14.122602924760443,
+  "std_angle": 4.269918721286157,
+  "stage_distribution": {
+    "1": {
+      "count": 1,
+      "percentage": 2.0,
+      "description": "1단계 - A등급 (최고 자세)"
+    },
+    "2": {
+      "count": 3,
+      "percentage": 6.0,
+      "description": "2단계 - B등급 (매우 좋은 자세)"
+    },
+    "3": {
+      "count": 8,
+      "percentage": 16.0,
+      "description": "3단계 - B등급 (좋은 자세)"
+    },
+    "4": {
+      "count": 13,
+      "percentage": 26.0,
+      "description": "4단계 - B등급 (양호한 자세)"
+    },
+    "5": {
+      "count": 13,
+      "percentage": 26.0,
+      "description": "5단계 - B등급 (보통 자세)"
+    },
+    "6": {
+      "count": 2,
+      "percentage": 4.0,
+      "description": "6단계 - C등급 (보통 이하 자세)"
+    },
+    "7": {
+      "count": 4,
+      "percentage": 8.0,
+      "description": "7단계 - C등급 (개선 필요 자세)"
+    },
+    "8": {
+      "count": 3,
+      "percentage": 6.0,
+      "description": "8단계 - C등급 (나쁜 자세)"
+    },
+    "9": {
+      "count": 2,
+      "percentage": 4.0,
+      "description": "9단계 - C등급 (매우 나쁜 자세)"
+    },
+    "10": {
+      "count": 1,
+      "percentage": 2.0,
+      "description": "10단계 - C등급 (최악의 자세)"
+    }
+  },
+  "grade_distribution": {
+    "A": {
+      "count": 1,
+      "percentage": 2.0,
+      "description": "A등급 (가장 바른 자세 - 1단계)"
+    },
+    "B": {
+      "count": 37,
+      "percentage": 74.0,
+      "description": "B등급 (보통 자세 - 2-5단계)"
+    },
+    "C": {
+      "count": 12,
+      "percentage": 24.0,
+      "description": "C등급 (나쁜 자세)"
+    }
+  }
+}

@@ -3,6 +3,8 @@
 """
 실시간 자세 등급 피드백 시스템
 
+python3 realtime_posture_feedback.py --csv data/results/side_analysis_p1/side_angle_analysis.csv
+
 웹캠으로 실시간 영상을 받아서 자세를 분석하고 등급(A/B/C)과 피드백을 화면에 표시합니다.
 """
 

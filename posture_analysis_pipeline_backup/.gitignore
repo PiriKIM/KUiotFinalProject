@@ -101,14 +101,6 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
 
 # Spyder project settings
 .spyderproject
@@ -128,28 +120,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Project-specific exclusions
-
-# Data files
-data/
-*.csv
-*.json
-*.xlsx
-*.xls
-*.h5
-*.hdf5
-*.pkl
-*.pickle
-
-# Image files
-*.jpg
-*.jpeg
-*.png
-*.gif
-*.bmp
-*.tiff
-*.tif
-*.webp
 
 # Video files
 *.mp4
@@ -166,14 +136,6 @@ data/
 *.flac
 *.aac
 *.ogg
-
-# Model files
-*.model
-*.pth
-*.pt
-*.onnx
-*.tflite
-*.pb
 
 # Log files
 *.log
@@ -244,13 +206,3 @@ site/
 *.tar.gz
 *.rar
 *.7z
-
-# Specific to this project
-posture_analysis_pipeline_backup/data/
-posture_analysis_pipeline_backup/results/
-posture_analysis_pipeline_backup/output/
-
-# Frame folders
-frames_posture_video_20250706_173222/
-frames_posture_video_20250706_173222_unzipped/
-**/frames_posture_video_*/ 
