@@ -175,12 +175,6 @@ secrets.json
 .env.local
 .env.production
 
-# Output directories
-output/
-results/
-analysis_results/
-side_analysis/
-
 # Virtual environment
 .venv/
 venv/

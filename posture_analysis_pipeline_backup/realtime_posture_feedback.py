@@ -309,7 +309,11 @@ def detect_side(landmarks):
 def main():
     """메인 함수"""
     parser = argparse.ArgumentParser(description='실시간 자세 등급 피드백 시스템')
-    parser.add_argument('--csv', '-c', required=True,
+    parser.add_argument('--right-csv', '-r', 
+                       help='오른쪽 측면 기준 데이터 CSV 파일 경로')
+    parser.add_argument('--left-csv', '-l', 
+                       help='왼쪽 측면 기준 데이터 CSV 파일 경로')
+    parser.add_argument('--csv', '-c', 
                        help='기준 데이터 CSV 파일 경로 (측면별로 자동 선택됨)')
     parser.add_argument('--side', '-s', choices=['right', 'left'], default='right',
                        help='측면 (right 또는 left)')
@@ -318,38 +322,40 @@ def main():
     
     args = parser.parse_args()
     
-    # 파일 존재 확인
-    if not Path(args.csv).exists():
-        print(f"❌ CSV 파일을 찾을 수 없습니다: {args.csv}")
-        return 1
-    
-    print(f"🎯 실시간 자세 등급 피드백 시스템을 시작합니다...")
-    print(f"📁 기준 데이터: {args.csv}")
-    print(f"📐 측면: {args.side}")
-    print(f"📷 카메라: {args.camera}")
-    
     # 측면별 CSV 파일 경로 설정
-    csv_base_path = Path(args.csv)
-    right_csv_path = csv_base_path
-    left_csv_path = csv_base_path
-    
-    # 측면별로 다른 CSV 파일 사용
-    if 'right' in str(csv_base_path) or 'p1' in str(csv_base_path):
-        # 오른쪽 측면용 CSV 파일들
-        right_csv_paths = [
-            "data/results/side_analysis_p1/side_angle_analysis.csv",
-            "data/posture_grades/posture_grades_right.csv",
-            "data/landmarks_p1/raw_landmarks.csv"
-        ]
-        left_csv_paths = [
-            "data/results/side_analysis_p2/side_angle_analysis.csv", 
-            "data/posture_grades/posture_grades_left.csv",
-            "data/landmarks_p2/raw_landmarks.csv"
-        ]
+    if args.right_csv and args.left_csv:
+        # 두 CSV 파일이 직접 입력된 경우
+        right_csv_paths = [args.right_csv]
+        left_csv_paths = [args.left_csv]
+        print(f"🎯 직접 입력된 측면별 CSV 파일:")
+        print(f"   오른쪽: {args.right_csv}")
+        print(f"   왼쪽: {args.left_csv}")
+    elif args.csv:
+        # 하나의 CSV 파일이 입력된 경우 (기존 방식)
+        csv_base_path = Path(args.csv)
+        
+        # 측면별로 다른 CSV 파일 사용
+        if 'right' in str(csv_base_path) or 'p1' in str(csv_base_path):
+            # 오른쪽 측면용 CSV 파일들
+            right_csv_paths = [
+                "data/results/side_analysis_p1/side_angle_analysis.csv",
+                "data/posture_grades/posture_grades_right.csv",
+                "data/landmarks_p1/raw_landmarks.csv"
+            ]
+            left_csv_paths = [
+                "data/results/side_analysis_p2/side_angle_analysis.csv", 
+                "data/posture_grades/posture_grades_left.csv",
+                "data/landmarks_p2/raw_landmarks.csv"
+            ]
+        else:
+            # 기본 경로 사용
+            right_csv_paths = [str(csv_base_path)]
+            left_csv_paths = [str(csv_base_path)]
     else:
-        # 기본 경로 사용
-        right_csv_paths = [str(csv_base_path)]
-        left_csv_paths = [str(csv_base_path)]
+        print("❌ CSV 파일을 지정해주세요.")
+        print("   방법 1: --right-csv와 --left-csv로 각각 지정")
+        print("   방법 2: --csv로 하나만 지정 (자동으로 측면별 파일 찾기)")
+        return 1
     
     # 사용 가능한 CSV 파일 찾기
     def find_available_csv(csv_paths):
