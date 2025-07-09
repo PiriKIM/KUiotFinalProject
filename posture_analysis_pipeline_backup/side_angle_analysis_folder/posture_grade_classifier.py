@@ -28,14 +28,14 @@ class PostureGradeClassifier:
         """초기화"""
         # 등급별 분류 기준 (CVA 각도 기준)
         self.grade_criteria = {
-            'A': {'range': (1, 1), 'description': 'A등급 (가장 바른 자세 - 1단계 상위 50%만)'},
-            'B': {'range': (1, 5), 'description': 'B등급 (보통 자세 - 1단계 하위 50% + 2-5단계)'},
+            'A': {'range': (1, 1), 'description': 'A등급 (가장 바른 자세 - 1단계)'},
+            'B': {'range': (2, 5), 'description': 'B등급 (보통 자세 - 2-5단계)'},
             'C': {'range': (6, 10), 'description': 'C등급 (나쁜 자세)'}
         }
         
         # 단계별 설명
         self.stage_descriptions = {
-            1: "1단계 - A/B등급 (최고 자세 - 상위 50%는 A, 하위 50%는 B)",
+            1: "1단계 - A등급 (최고 자세)",
             2: "2단계 - B등급 (매우 좋은 자세)",
             3: "3단계 - B등급 (좋은 자세)",
             4: "4단계 - B등급 (양호한 자세)",
@@ -86,21 +86,14 @@ class PostureGradeClassifier:
                 stage = max(1, min(10, stage))  # 1-10 범위 제한
                 stages.append(stage)
             
-            # 1단계 내에서 상위 50%만 A등급으로 분류
-            stage1_angles = [abs_angle for i, abs_angle in enumerate(abs_angles) if stages[i] == 1]
-            stage1_threshold = np.percentile(stage1_angles, 50) if len(stage1_angles) > 0 else 0
-            
             # 등급 결정
             grades = []
             for i, abs_angle in enumerate(abs_angles):
                 stage = stages[i]
                 
-                # 단계별 등급 결정 (1단계의 절반만 A, 나머지는 B/C)
-                if stage == 1:  # 1단계인 경우
-                    if abs_angle <= stage1_threshold:
-                        grade = 'A'  # 1단계 상위 절반: A등급
-                    else:
-                        grade = 'B'  # 1단계 하위 절반: B등급
+                # 단계별 등급 결정 (1단계: A, 2-5단계: B, 6-10단계: C)
+                if stage == 1:  # 1단계: A등급 (가장 바른 자세)
+                    grade = 'A'
                 elif stage <= 5:  # 2-5단계: B등급 (보통 자세)
                     grade = 'B'
                 else:  # 6-10단계: C등급 (나쁜 자세)
@@ -293,12 +286,9 @@ class PostureGradeClassifier:
             stage = int(normalized * 9) + 1
             stage = max(1, min(10, stage))  # 1-10 범위 제한
         
-        # 단계별 등급 결정 (1단계의 절반만 A, 나머지는 B/C)
-        if stage == 1:  # 1단계인 경우
-            if abs_angle <= stage1_threshold:
-                return 'A'  # 1단계 상위 절반: A등급
-            else:
-                return 'B'  # 1단계 하위 절반: B등급
+        # 단계별 등급 결정 (1단계: A, 2-5단계: B, 6-10단계: C)
+        if stage == 1:  # 1단계: A등급 (가장 바른 자세)
+            return 'A'
         elif stage <= 5:  # 2-5단계: B등급 (보통 자세)
             return 'B'
         else:  # 6-10단계: C등급 (나쁜 자세)
