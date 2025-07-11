@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>스마트폰 카메라 스트리밍</title>
+</head>
+<body>
+  <h1>카메라에서 전송 중...</h1>
+
+  <!-- 버튼은 처음엔 비활성화 -->
+  <button id="startBtn" disabled>카메라 사용 시작</button>
+
+  <video id="video" autoplay playsinline style="border:2px solid red; background:black; width:100%; max-width:480px;"></video>
+  <p id="result">결과: 없음</p>
+
+  <script src="/static/js/capture.js"></script>
+</body>
+</html>

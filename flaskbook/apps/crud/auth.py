@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash
 from .models import User, PostureRecord, db
 from datetime import datetime
@@ -63,8 +64,7 @@ def login():
         user = User.query.filter_by(username=username).first()
         
         if user and user.check_password(password):
-            session['user_id'] = user.id
-            session['username'] = user.username
+            login_user(user)
             user.update_last_login()
             flash(f'{user.username}님, 환영합니다!', 'success')
             return redirect(url_for('crud.index'))
@@ -75,22 +75,16 @@ def login():
     return render_template('crud/login.html')
 
 @auth.route('/logout')
+@login_required
 def logout():
-    session.clear()
+    logout_user()
     flash('로그아웃되었습니다.', 'info')
     return redirect(url_for('auth.login'))
 
 @auth.route('/profile')
+@login_required
 def profile():
-    if 'user_id' not in session:
-        flash('로그인이 필요합니다.', 'error')
-        return redirect(url_for('auth.login'))
-    
-    user = User.query.get(session['user_id'])
-    if not user:
-        session.clear()
-        flash('사용자 정보를 찾을 수 없습니다.', 'error')
-        return redirect(url_for('auth.login'))
+    user = current_user
     
     # 최근 자세 분석 기록 가져오기 (최근 10개)
     recent_records = user.posture_records.order_by(PostureRecord.analysis_date.desc()).limit(10).all()

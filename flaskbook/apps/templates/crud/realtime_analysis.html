@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 자세 분석 - 자세지키미</title>
+    <link rel="stylesheet" href="{{ url_for('crud.static', filename='style.css') }}">
+    <style>
+        .analysis-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .video-container {
+            text-align: center;
+            margin-bottom: 30px;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .video-feed {
+            width: 100%;
+            max-width: 640px;
+            height: auto;
+        }
+        
+        .controls {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-start {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .btn-start:hover {
+            background-color: #218838;
+        }
+        
+        .btn-stop {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .btn-stop:hover {
+            background-color: #c82333;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .analysis-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .result-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #007bff;
+        }
+        
+        .result-card h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .grade-display {
+            font-size: 48px;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .grade-a {
+            background-color: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+        
+        .grade-b {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffeaa7;
+        }
+        
+        .grade-c {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-connected {
+            background-color: #28a745;
+        }
+        
+        .status-disconnected {
+            background-color: #dc3545;
+        }
+        
+        .feedback-message {
+            font-size: 18px;
+            text-align: center;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="analysis-container">
+        <h1>📹 실시간 자세 분석</h1>
+        
+        <!-- 상태 표시 -->
+        <div class="status-bar">
+            <span class="status-indicator" id="connectionStatus"></span>
+            <span id="statusText">ESP32-CAM 연결 대기 중...</span>
+        </div>
+        
+        <!-- 비디오 스트림 -->
+        <div class="video-container">
+            <img src="{{ url_for('realtime.video_feed') }}" alt="실시간 스트림" class="video-feed" id="videoFeed">
+        </div>
+        
+        <!-- 컨트롤 버튼 -->
+        <div class="controls">
+            <button class="btn btn-start" id="startBtn" onclick="startAnalysis()">분석 시작</button>
+            <button class="btn btn-stop" id="stopBtn" onclick="stopAnalysis()" disabled>분석 중지</button>
+            <a href="{{ url_for('realtime.analysis_history') }}" class="btn" style="background-color: #6c757d; color: white; text-decoration: none;">분석 기록</a>
+        </div>
+        
+        <!-- 분석 결과 -->
+        <div class="analysis-results" id="analysisResults">
+            <div class="loading">
+                <h3>분석을 시작해주세요</h3>
+                <p>ESP32-CAM에서 전송된 영상을 실시간으로 분석합니다.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isAnalyzing = false;
+        let analysisInterval = null;
+        
+        // 연결 상태 확인
+        function checkConnection() {
+            const statusIndicator = document.getElementById('connectionStatus');
+            const statusText = document.getElementById('statusText');
+            
+            // 비디오 피드가 로드되었는지 확인
+            const videoFeed = document.getElementById('videoFeed');
+            
+            if (videoFeed.complete && videoFeed.naturalWidth > 0) {
+                statusIndicator.className = 'status-indicator status-connected';
+                statusText.textContent = 'ESP32-CAM 연결됨';
+            } else {
+                statusIndicator.className = 'status-indicator status-disconnected';
+                statusText.textContent = 'ESP32-CAM 연결 대기 중...';
+            }
+        }
+        
+        // 분석 시작
+        function startAnalysis() {
+            if (isAnalyzing) return;
+            
+            fetch('/realtime/start_analysis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    isAnalyzing = true;
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                    
+                    // 분석 결과 주기적 업데이트
+                    analysisInterval = setInterval(updateAnalysisResults, 1000);
+                    
+                    // 초기 결과 업데이트
+                    updateAnalysisResults();
+                } else {
+                    showError(data.message);
+                }
+            })
+            .catch(error => {
+                showError('분석 시작 중 오류가 발생했습니다: ' + error.message);
+            });
+        }
+        
+        // 분석 중지
+        function stopAnalysis() {
+            if (!isAnalyzing) return;
+            
+            fetch('/realtime/stop_analysis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    isAnalyzing = false;
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                    
+                    if (analysisInterval) {
+                        clearInterval(analysisInterval);
+                        analysisInterval = null;
+                    }
+                    
+                    // 분석 결과 초기화
+                    document.getElementById('analysisResults').innerHTML = `
+                        <div class="loading">
+                            <h3>분석이 중지되었습니다</h3>
+                            <p>다시 시작하려면 "분석 시작" 버튼을 클릭하세요.</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                showError('분석 중지 중 오류가 발생했습니다: ' + error.message);
+            });
+        }
+        
+        // 분석 결과 업데이트
+        function updateAnalysisResults() {
+            fetch('/realtime/get_analysis_result')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' && data.result) {
+                    displayAnalysisResults(data.result);
+                } else if (data.status === 'no_analysis') {
+                    // 분석 중이 아니거나 결과가 없는 경우
+                    return;
+                }
+            })
+            .catch(error => {
+                console.error('분석 결과 업데이트 오류:', error);
+            });
+        }
+        
+        // 분석 결과 표시
+        function displayAnalysisResults(result) {
+            const resultsContainer = document.getElementById('analysisResults');
+            
+            if (!result.pose_detected) {
+                resultsContainer.innerHTML = `
+                    <div class="result-card">
+                        <h3>자세 감지 안됨</h3>
+                        <div class="feedback-message">
+                            카메라 앞에 서서 자세를 취해주세요.
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let gradeClass = '';
+            if (result.posture_grade === 'A') {
+                gradeClass = 'grade-a';
+            } else if (result.posture_grade === 'B') {
+                gradeClass = 'grade-b';
+            } else if (result.posture_grade === 'C') {
+                gradeClass = 'grade-c';
+            }
+            
+            resultsContainer.innerHTML = `
+                <div class="result-card">
+                    <h3>자세 등급</h3>
+                    <div class="grade-display ${gradeClass}">
+                        ${result.posture_grade || 'N/A'}
+                    </div>
+                    <div class="feedback-message">
+                        ${result.feedback_message || '분석 중...'}
+                    </div>
+                </div>
+                
+                <div class="result-card">
+                    <h3>분석 정보</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value">${result.detected_side || 'Unknown'}</div>
+                            <div class="stat-label">감지된 측면</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${(result.ml_confidence * 100).toFixed(1)}%</div>
+                            <div class="stat-label">ML 신뢰도</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${result.cva_angle ? result.cva_angle.toFixed(1) + '°' : 'N/A'}</div>
+                            <div class="stat-label">CVA 각도</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 오류 메시지 표시
+        function showError(message) {
+            const resultsContainer = document.getElementById('analysisResults');
+            resultsContainer.innerHTML = `
+                <div class="error-message">
+                    <strong>오류:</strong> ${message}
+                </div>
+            `;
+        }
+        
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            // 연결 상태 주기적 확인
+            setInterval(checkConnection, 2000);
+            
+            // 초기 연결 상태 확인
+            checkConnection();
+        });
+    </script>
+</body>
+</html> 

@@ -1,8 +1,9 @@
 from datetime import datetime
 from apps.app import db
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import UserMixin
 
-class User(db.Model):
+class User(db.Model, UserMixin):
     __tablename__ = "user"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -15,6 +16,7 @@ class User(db.Model):
     
     # 관계 설정 - 사용자의 자세 분석 기록들
     posture_records = db.relationship('PostureRecord', backref='user', lazy='dynamic', cascade='all, delete-orphan')
+    realtime_records = db.relationship('RealtimePostureRecord', backref='user', lazy='dynamic', cascade='all, delete-orphan')
     
     @property
     def password(self):
@@ -30,6 +32,18 @@ class User(db.Model):
     def update_last_login(self):
         self.last_login = datetime.now()
         db.session.commit()
+    
+    def get_id(self):
+        return str(self.id)
+    
+    def is_authenticated(self):
+        return True
+    
+    def is_active(self):
+        return True
+    
+    def is_anonymous(self):
+        return False
 
 class PostureRecord(db.Model):
     __tablename__ = "posture_record"
@@ -102,3 +116,32 @@ class PostureRecord(db.Model):
             return 'C'
         else:
             return 'D'
+
+class RealtimePostureRecord(db.Model):
+    __tablename__ = "realtime_posture_record"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
+    
+    # ML 모델 분석 결과
+    detected_side = db.Column(db.String(10))  # 'front', 'left', 'right', 'unknown'
+    ml_confidence = db.Column(db.Float)  # ML 모델 신뢰도
+    
+    # CVA 각도 분석
+    cva_angle = db.Column(db.Float)  # Cervical Vertebral Angle
+    posture_grade = db.Column(db.String(1))  # A, B, C
+    
+    # 기준값 정보
+    min_abs_threshold = db.Column(db.Float)
+    max_abs_threshold = db.Column(db.Float)
+    stage1_threshold = db.Column(db.Float)
+    
+    # 피드백 메시지
+    feedback_message = db.Column(db.String(200))
+    
+    # 프레임 정보
+    frame_count = db.Column(db.Integer)
+    
+    def __repr__(self):
+        return f'<RealtimePostureRecord {self.id}: {self.posture_grade} at {self.timestamp}>'

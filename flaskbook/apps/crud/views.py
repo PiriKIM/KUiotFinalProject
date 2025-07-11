@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
+from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
+from flask_login import login_required, current_user
 import numpy as np
 import cv2
 from .neck import PostureAnalyzer
@@ -15,21 +16,17 @@ crud = Blueprint(
 
 analyzer = PostureAnalyzer()
 
-def login_required(f):
-    """로그인 필요 데코레이터"""
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            flash('로그인이 필요합니다.', 'error')
-            return redirect(url_for('auth.login'))
-        return f(*args, **kwargs)
-    decorated_function.__name__ = f.__name__
-    return decorated_function
-
 @crud.route('/')
 @login_required
 def index():
-    user = User.query.get(session['user_id'])
+    user = current_user
     return render_template('crud/index.html', user=user)
+
+@crud.route('/realtime')
+@login_required
+def realtime():
+    """실시간 분석 페이지로 리다이렉트"""
+    return redirect(url_for('realtime.realtime_analysis_page'))
 
 @crud.route('/analyze', methods=['POST'])
 @login_required
@@ -57,7 +54,7 @@ def analyze():
             twist_result = analyzer.analyze_spine_twisting(lm)
             
             # 데이터베이스에 분석 결과 저장
-            user = User.query.get(session['user_id'])
+            user = current_user
             posture_record = PostureRecord(
                 user_id=user.id,
                 neck_angle=neck_result['neck_angle'],
@@ -100,7 +97,7 @@ def analyze():
 @login_required
 def history():
     """사용자의 자세 분석 기록 페이지"""
-    user = User.query.get(session['user_id'])
+    user = current_user
     page = request.args.get('page', 1, type=int)
     per_page = 20
     
@@ -119,7 +116,7 @@ def history():
 @login_required
 def statistics():
     """사용자의 자세 분석 통계 페이지"""
-    user = User.query.get(session['user_id'])
+    user = current_user
     
     # 전체 통계
     total_records = user.posture_records.count()
