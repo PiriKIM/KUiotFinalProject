@@ -233,7 +233,7 @@ def train_4way_model(X, y):
 def main():
     """메인 실행 함수"""
     # 데이터 준비
-    X, y = prepare_data('test/data/P1_0706/pose_landmarks_P1_merged.csv')
+    X, y = prepare_data('../data/P1_0628/pose_landmarks_P1.csv')
     
     # 3클래스 분류 모델 학습
     model, scaler, accuracy = train_4way_model(X, y)

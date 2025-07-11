@@ -6,7 +6,7 @@ import numpy as np
 # 설정
 speed = 1.0  # 음성 속도 조절
 device = 'cpu'  # GPU 사용 시 'cuda' 또는 'cuda:0'
-text = "안녕하세요."
+text = "자세를 바르게 하세요."
 model = TTS(language='KR', device=device)
 speaker_ids = model.hps.data.spk2id
 

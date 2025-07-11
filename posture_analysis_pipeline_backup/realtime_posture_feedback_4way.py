@@ -3,11 +3,14 @@
 """
 실시간 자세 등급 피드백 시스템 (4way 모델 통합)
 
-python3 realtime_posture_feedback.py --csv data/results/side_analysis_p1/side_angle_analysis.csv
+python3 realtime_posture_feedback_4way.py --csv data/results/side_analysis_p1/side_angle_analysis.csv
 
 웹캠으로 실시간 영상을 받아서 자세를 분석하고 등급(A/B/C)과 피드백을 화면에 표시합니다.
 4way 모델을 사용하여 측면을 자동으로 감지하고, 자세 등급을 매깁니다.
 """
+
+import os
+import sys
 
 import cv2
 import mediapipe as mp
@@ -447,12 +450,11 @@ def detect_side_with_4way_model(landmarks, classifier):
         
         if prediction is not None and probability is not None:
             # 예측 결과에 따른 측면 결정
-            if prediction == 1:  # 정면
-                # 정면일 때는 기본값으로 오른쪽 측면 사용
-                return 'right'
-            elif prediction == 2:  # 좌측면
+            if prediction == 0:  # 정면
+                return None  # 정면일 때는 None 반환
+            elif prediction == 1:  # 좌측면
                 return 'left'
-            elif prediction == 3:  # 우측면
+            elif prediction == 2:  # 우측면
                 return 'right'
             else:
                 return 'right'  # 기본값
@@ -594,6 +596,9 @@ def main():
     if not cap.isOpened():
         print(f"❌ 카메라를 열 수 없습니다. 카메라 인덱스 {args.camera}를 확인해주세요.")
         return 1
+
+    # OpenCV 창 명시적으로 생성
+    cv2.namedWindow('Real-time Posture Feedback (4way 통합)', cv2.WINDOW_NORMAL)
     
     print(f"\n🎥 카메라가 시작되었습니다.")
     print(f"💡 ESC 키를 누르면 종료됩니다.")
@@ -621,13 +626,31 @@ def main():
             detected_side = detect_side_with_4way_model(results.pose_landmarks.landmark, classifier)
             if frame_count == 0:
                 print(f"🎯 4way 모델로 감지된 측면: {detected_side}")
-            current_side = detected_side
+            elif frame_count % 30 == 0:  # 30프레임마다 측면 정보 출력
+                print(f"🎯 측면 감지: {detected_side}")
             
             # 측면에 따른 기준값 선택
-            current_thresholds = right_thresholds if current_side == 'right' else left_thresholds
-            
-            # CVA 각도 계산
-            cva_angle = calculate_cva_angle(results.pose_landmarks.landmark, current_side)
+            if detected_side is not None:
+                current_thresholds = right_thresholds if detected_side == 'right' else left_thresholds
+                
+                # CVA 각도 계산 (측면일 때만)
+                cva_angle = calculate_cva_angle(results.pose_landmarks.landmark, detected_side)
+                
+                # 각도 범위 제한 (비정상적인 값 필터링)
+                if abs(cva_angle) > 90:
+                    cva_angle = np.clip(cva_angle, -90, 90)
+                
+                # 등급 분류 (측면별 기준값 사용)
+                grade = posture_classifier.get_grade_for_angle(
+                    cva_angle, 
+                    current_thresholds['min_abs'], 
+                    current_thresholds['max_abs'], 
+                    current_thresholds['stage1_threshold']
+                )
+            else:
+                # 정면일 때는 CVA 각도 계산하지 않음
+                cva_angle = None
+                grade = None
             
             # 자세 등급 분석 (PostureAnalyzer 사용)
             comprehensive_grade = posture_analyzer.get_comprehensive_grade(results.pose_landmarks.landmark)
@@ -636,35 +659,24 @@ def main():
             
             # 디버깅 정보 (처음 5프레임에서만)
             if frame_count < 5:
-                if current_side == 'right':
+                if detected_side == 'right':
                     ear = results.pose_landmarks.landmark[8]
                     shoulder = results.pose_landmarks.landmark[12]
                 else:
                     ear = results.pose_landmarks.landmark[7]
                     shoulder = results.pose_landmarks.landmark[11]
                 
-                print(f"🔍 프레임 {frame_count}: 측면={current_side}, 각도={cva_angle:.1f}°")
+                print(f"🔍 프레임 {frame_count}: 측면={detected_side}, 각도={cva_angle:.1f}°")
                 print(f"   귀: ({ear.x:.3f}, {ear.y:.3f}), 가시성: {ear.visibility:.3f}")
                 print(f"   어깨: ({shoulder.x:.3f}, {shoulder.y:.3f}), 가시성: {shoulder.visibility:.3f}")
                 print(f"   사용 기준값: {current_thresholds['min_abs']:.2f} ~ {current_thresholds['max_abs']:.2f}")
                 print(f"   자세 등급: {posture_grade} (점수: {posture_score:.1f})")
             
-            # 각도 범위 제한 (비정상적인 값 필터링)
-            if abs(cva_angle) > 90:
-                cva_angle = np.clip(cva_angle, -90, 90)
-            
-            # 등급 분류 (측면별 기준값 사용)
-            grade = posture_classifier.get_grade_for_angle(
-                cva_angle, 
-                current_thresholds['min_abs'], 
-                current_thresholds['max_abs'], 
-                current_thresholds['stage1_threshold']
-            )
-            
             # 등급 히스토리 업데이트 (최근 10프레임)
-            grade_history.append(grade)
-            if len(grade_history) > 10:
-                grade_history.pop(0)
+            if grade is not None:
+                grade_history.append(grade)
+                if len(grade_history) > 10:
+                    grade_history.pop(0)
             
             # 자세 히스토리 업데이트 (최근 10프레임)
             pose_history.append(posture_grade)
@@ -672,7 +684,7 @@ def main():
                 pose_history.pop(0)
             
             # 안정화된 등급 (최근 5프레임 중 가장 많은 등급)
-            if len(grade_history) >= 5:
+            if len(grade_history) >= 5 and grade is not None:
                 stable_grade = max(set(grade_history[-5:]), key=grade_history[-5:].count)
             else:
                 stable_grade = grade
@@ -683,27 +695,32 @@ def main():
             else:
                 stable_posture_grade = posture_grade
             
-            # 피드백 메시지와 색상
-            message, color = get_feedback_message(stable_grade, cva_angle)
+            # 피드백 메시지와 색상 (측면일 때만)
+            if stable_grade is not None and cva_angle is not None:
+                message, color = get_feedback_message(stable_grade, cva_angle)
+            else:
+                # 정면일 때는 자세 등급만 표시
+                message = "정면 자세 분석 중..."
+                color = (128, 128, 128)  # 회색
             
             # 화면에 정보 표시
-            # 등급 표시
-            frame = put_korean_text(frame, f"Grade: {stable_grade}", 
-                                   (30, 80), font_size=48, color=color)
+            # 등급 표시 (측면일 때만)
+            if stable_grade is not None:
+                frame = put_korean_text(frame, f"Grade: {stable_grade}", 
+                                       (30, 80), font_size=48, color=color)
+            else:
+                frame = put_korean_text(frame, "Front View", 
+                                       (30, 80), font_size=48, color=(128, 128, 128))
             
-            # CVA 각도 표시
-            frame = put_korean_text(frame, f"CVA: {cva_angle:.1f}°", 
-                                   (30, 130), font_size=32, color=(255, 255, 255))
-            
-            # 4way 모델로 감지된 측면 정보 표시 (색상으로 구분)
-            side_color = (0, 255, 0) if current_side == 'right' else (255, 0, 0)  # 초록색(오른쪽) vs 빨간색(왼쪽)
-            frame = put_korean_text(frame, f"4Way Side: {current_side.upper()}", 
-                                   (30, 160), font_size=24, color=side_color)
+            # CVA 각도 표시 (측면일 때만)
+            if cva_angle is not None:
+                frame = put_korean_text(frame, f"CVA: {cva_angle:.1f}°", 
+                                       (30, 130), font_size=32, color=(255, 255, 255))
+            # 정면일 때는 CVA 각도를 표시하지 않음
             
             # 자세 등급 표시 (PostureAnalyzer 결과)
-            posture_color = (0, 255, 0) if stable_posture_grade == 'A' else (0, 255, 255) if stable_posture_grade == 'B' else (0, 0, 255)
-            frame = put_korean_text(frame, f"Posture Grade: {stable_posture_grade} (점수: {posture_score:.1f})", 
-                                   (30, 190), font_size=24, color=posture_color)
+            # frame = put_korean_text(frame, f"Posture Grade: {stable_posture_grade} (점수: {posture_score:.1f})", 
+            #                        (30, 190), font_size=24, color=posture_color)
             
             # 피드백 메시지 표시
             frame = put_korean_text(frame, message, 
