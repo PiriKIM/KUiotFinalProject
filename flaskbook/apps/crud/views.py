@@ -96,14 +96,15 @@ def analyze():
 @crud.route('/history')
 @login_required
 def history():
-    """사용자의 자세 분석 기록 페이지"""
+    """사용자의 실시간 자세 분석 기록 페이지"""
     user = current_user
     page = request.args.get('page', 1, type=int)
     per_page = 20
     
-    # 페이지네이션으로 기록 가져오기
-    records = user.posture_records.order_by(
-        PostureRecord.analysis_date.desc()
+    # 실시간 분석 기록을 페이지네이션으로 가져오기
+    from .models import RealtimePostureRecord
+    records = user.realtime_records.order_by(
+        RealtimePostureRecord.timestamp.desc()
     ).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -115,43 +116,70 @@ def history():
 @crud.route('/statistics')
 @login_required
 def statistics():
-    """사용자의 자세 분석 통계 페이지"""
+    """사용자의 실시간 자세 분석 통계 페이지"""
     user = current_user
     
-    # 전체 통계
-    total_records = user.posture_records.count()
+    # 실시간 분석 통계
+    from .models import RealtimePostureRecord
+    total_records = user.realtime_records.count()
+    
     if total_records > 0:
-        all_records = user.posture_records.all()
-        avg_score = sum(record.calculate_overall_score() for record in all_records) / total_records
-        grade_counts = {'A': 0, 'B': 0, 'C': 0, 'D': 0}
+        all_records = user.realtime_records.all()
+        
+        # 등급별 통계 (N/A 제외)
+        grade_counts = {'A': 0, 'B': 0, 'C': 0}
         for record in all_records:
-            grade = record.calculate_overall_grade()
-            grade_counts[grade] += 1
+            if record.posture_grade and record.posture_grade != 'N/A':
+                grade_counts[record.posture_grade] += 1
+        
+        # 평균 CVA 각도
+        valid_angles = [r.cva_angle for r in all_records if r.cva_angle is not None]
+        avg_cva_angle = sum(valid_angles) / len(valid_angles) if valid_angles else 0
+        
+        # 최근 7일 통계 (N/A 제외)
         week_ago = datetime.now() - timedelta(days=7)
-        recent_records = [r for r in all_records if r.analysis_date >= week_ago]
-        recent_avg = sum(r.calculate_overall_score() for r in recent_records) / len(recent_records) if recent_records else 0
+        recent_records = [r for r in all_records if r.timestamp >= week_ago]
+        recent_grade_counts = {'A': 0, 'B': 0, 'C': 0}
+        for record in recent_records:
+            if record.posture_grade and record.posture_grade != 'N/A':
+                recent_grade_counts[record.posture_grade] += 1
+        
+        # 측면별 통계
+        side_counts = {}
+        for record in all_records:
+            side = record.detected_side if record.detected_side else 'unknown'
+            side_counts[side] = side_counts.get(side, 0) + 1
+        
+        # 월별 통계
         monthly_stats = {}
         for i in range(6):
             month_start = datetime.now().replace(day=1) - timedelta(days=30*i)
             month_end = month_start.replace(day=28) + timedelta(days=4)
             month_end = month_end.replace(day=1) - timedelta(days=1)
-            month_records = [r for r in all_records if month_start <= r.analysis_date <= month_end]
+            month_records = [r for r in all_records if month_start <= r.timestamp <= month_end]
             if month_records:
+                month_grade_counts = {'A': 0, 'B': 0, 'C': 0}
+                for record in month_records:
+                    if record.posture_grade and record.posture_grade != 'N/A':
+                        month_grade_counts[record.posture_grade] += 1
+                
                 monthly_stats[month_start.strftime('%Y-%m')] = {
                     'count': len(month_records),
-                    'avg_score': sum(r.calculate_overall_score() for r in month_records) / len(month_records)
+                    'grade_counts': month_grade_counts
                 }
     else:
-        avg_score = 0
-        grade_counts = {'A': 0, 'B': 0, 'C': 0, 'D': 0}
-        recent_avg = 0
+        grade_counts = {'A': 0, 'B': 0, 'C': 0}
+        avg_cva_angle = 0
+        recent_grade_counts = {'A': 0, 'B': 0, 'C': 0}
+        side_counts = {}
         monthly_stats = {}
     
     return render_template('crud/statistics.html',
                          user=user,
                          total_records=total_records,
-                         avg_score=avg_score,
                          grade_counts=grade_counts,
-                         recent_avg=recent_avg,
+                         avg_cva_angle=avg_cva_angle,
+                         recent_grade_counts=recent_grade_counts,
+                         side_counts=side_counts,
                          monthly_stats=monthly_stats,
                          now=datetime.now())

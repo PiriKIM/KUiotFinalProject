@@ -19,6 +19,8 @@ from flask_login import login_required, current_user
 from apps.app import db
 from apps.crud.models import RealtimePostureRecord
 import warnings
+import subprocess
+import os
 warnings.filterwarnings('ignore')
 
 # 자체 모듈 import
@@ -33,6 +35,67 @@ current_frame = None
 analysis_results = {}
 is_analyzing = False
 frame_lock = threading.Lock()
+
+# 음성 재생 관련 전역 변수
+last_audio_play_time = 0
+AUDIO_COOLDOWN = 30  # 30초 쿨다운
+AUDIO_FILE_PATH = '/home/piri/KUiotFinalProject/flaskbook/output.wav'
+
+def play_audio_if_needed(grade):
+    """C등급 감지 시 음성 재생 (30초 쿨다운 적용)"""
+    global last_audio_play_time
+    
+    if grade == 'C':
+        current_time = time.time()
+        
+        # 30초 쿨다운 확인
+        if current_time - last_audio_play_time >= AUDIO_COOLDOWN:
+            if os.path.exists(AUDIO_FILE_PATH):
+                try:
+                    # 여러 음성 재생 방법 시도
+                    audio_played = False
+                    
+                    # 방법 1: aplay 사용
+                    try:
+                        subprocess.Popen(['aplay', AUDIO_FILE_PATH], 
+                                       stdout=subprocess.DEVNULL, 
+                                       stderr=subprocess.DEVNULL)
+                        audio_played = True
+                        print(f"🔊 C등급 감지! aplay로 음성 재생됨 (시간: {datetime.now().strftime('%H:%M:%S')})")
+                    except Exception as e:
+                        print(f"❌ aplay 재생 실패: {e}")
+                    
+                    # 방법 2: paplay 사용 (PulseAudio)
+                    if not audio_played:
+                        try:
+                            subprocess.Popen(['paplay', AUDIO_FILE_PATH], 
+                                           stdout=subprocess.DEVNULL, 
+                                           stderr=subprocess.DEVNULL)
+                            audio_played = True
+                            print(f"🔊 C등급 감지! paplay로 음성 재생됨 (시간: {datetime.now().strftime('%H:%M:%S')})")
+                        except Exception as e:
+                            print(f"❌ paplay 재생 실패: {e}")
+                    
+                    # 방법 3: ffplay 사용
+                    if not audio_played:
+                        try:
+                            subprocess.Popen(['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', AUDIO_FILE_PATH], 
+                                           stdout=subprocess.DEVNULL, 
+                                           stderr=subprocess.DEVNULL)
+                            audio_played = True
+                            print(f"🔊 C등급 감지! ffplay로 음성 재생됨 (시간: {datetime.now().strftime('%H:%M:%S')})")
+                        except Exception as e:
+                            print(f"❌ ffplay 재생 실패: {e}")
+                    
+                    if audio_played:
+                        last_audio_play_time = current_time
+                    else:
+                        print("❌ 모든 음성 재생 방법이 실패했습니다.")
+                        
+                except Exception as e:
+                    print(f"❌ 음성 재생 중 오류: {e}")
+            else:
+                print(f"❌ 음성 파일을 찾을 수 없습니다: {AUDIO_FILE_PATH}")
 
 class MLPoseClassifier:
     """ML 모델 기반 자세 분류기 (4way 모델 사용)"""
@@ -403,6 +466,9 @@ def analyze_frame(frame):
                     current_thresholds['stage1_threshold']
                 )
                 
+                # C등급 감지 시 음성 재생
+                play_audio_if_needed(grade)
+                
                 # 피드백 메시지
                 message, color = get_feedback_message(grade, cva_angle)
                 
@@ -549,29 +615,33 @@ def get_analysis_result():
     result = analyze_frame(current_frame)
     
     if result and result.get('pose_detected', False):
-        # 데이터베이스에 저장
-        try:
-            record = RealtimePostureRecord(
-                user_id=current_user.id,
-                detected_side=result.get('detected_side', 'unknown'),
-                ml_confidence=result.get('ml_confidence', 0.0),
-                cva_angle=result.get('cva_angle', 0.0),
-                posture_grade=result.get('posture_grade', 'N/A'),
-                feedback_message=result.get('feedback_message', ''),
-                min_abs_threshold=result.get('min_abs_threshold', 0.0),
-                max_abs_threshold=result.get('max_abs_threshold', 0.0),
-                stage1_threshold=result.get('stage1_threshold', 0.0),
-                frame_count=len(analysis_results) + 1
-            )
-            
-            db.session.add(record)
-            db.session.commit()
-            
-            # 분석 결과에 저장
-            analysis_results[record.id] = result
-            
-        except Exception as e:
-            print(f"❌ 데이터베이스 저장 오류: {e}")
+        # N/A 등급이 아닌 경우에만 데이터베이스에 저장
+        if result.get('posture_grade') and result.get('posture_grade') != 'N/A':
+            try:
+                record = RealtimePostureRecord(
+                    user_id=current_user.id,
+                    detected_side=result.get('detected_side', 'unknown'),
+                    ml_confidence=result.get('ml_confidence', 0.0),
+                    cva_angle=result.get('cva_angle', 0.0),
+                    posture_grade=result.get('posture_grade'),
+                    feedback_message=result.get('feedback_message', ''),
+                    min_abs_threshold=result.get('min_abs_threshold', 0.0),
+                    max_abs_threshold=result.get('max_abs_threshold', 0.0),
+                    stage1_threshold=result.get('stage1_threshold', 0.0),
+                    frame_count=len(analysis_results) + 1
+                )
+                
+                db.session.add(record)
+                db.session.commit()
+                
+                # 분석 결과에 저장
+                analysis_results[record.id] = result
+                
+            except Exception as e:
+                print(f"❌ 데이터베이스 저장 오류: {e}")
+        else:
+            # N/A 등급인 경우 분석 결과에만 저장 (DB 저장 안함)
+            analysis_results[f"temp_{len(analysis_results)}"] = result
     
     return jsonify({
         'status': 'success',

@@ -131,6 +131,7 @@
         .grade-b { background-color: #17a2b8; }
         .grade-c { background-color: #ffc107; }
         .grade-d { background-color: #dc3545; }
+        .grade-na { background-color: #6c757d; }
         
         .record-details {
             display: grid;
@@ -251,7 +252,8 @@
     <nav class="navbar">
         <div class="navbar-brand">자세 분석 시스템</div>
         <ul class="navbar-nav">
-            <li><a href="{{ url_for('crud.index') }}">분석</a></li>
+            <!-- <li><a href="{{ url_for('crud.index') }}">분석</a></li> -->
+            <li><a href="{{ url_for('realtime.realtime_analysis_page') }}">실시간 분석</a></li>
             <li><a href="{{ url_for('crud.history') }}">기록</a></li>
             <li><a href="{{ url_for('crud.statistics') }}">통계</a></li>
             <li><a href="{{ url_for('auth.profile') }}">프로필</a></li>
@@ -271,49 +273,51 @@
                     <div class="record-card">
                         <div class="record-header">
                             <div class="record-date">
-                                {{ record.analysis_date.strftime('%Y년 %m월 %d일 %H:%M') }}
+                                {{ record.timestamp.strftime('%Y년 %m월 %d일 %H:%M') }}
                             </div>
                             <div class="record-score">
-                                <span class="score-number">{{ record.calculate_overall_score() }}</span>
-                                <span class="grade-badge grade-{{ record.calculate_overall_grade().lower() }}">
-                                    {{ record.calculate_overall_grade() }}
+                                <span class="grade-badge grade-{{ record.posture_grade.lower() if record.posture_grade else 'c' }}">
+                                    {{ record.posture_grade if record.posture_grade else 'C' }}
                                 </span>
                             </div>
                         </div>
                         
                         <div class="record-details">
                             <div class="detail-item">
-                                <div class="detail-label">목 자세</div>
-                                <div class="detail-value {% if record.neck_grade in ['A', 'B'] %}good{% elif record.neck_grade == 'C' %}warning{% else %}bad{% endif %}">
-                                    {{ record.neck_description }} ({{ "%.1f"|format(record.neck_angle) }}°)
+                                <div class="detail-label">CVA 각도</div>
+                                <div class="detail-value {% if record.cva_angle and record.cva_angle < 20 %}good{% elif record.cva_angle and record.cva_angle < 30 %}warning{% else %}bad{% endif %}">
+                                    {{ "%.1f"|format(record.cva_angle) if record.cva_angle else '0.0' }}°
                                 </div>
                             </div>
                             
                             <div class="detail-item">
-                                <div class="detail-label">척추 곡률</div>
-                                <div class="detail-value {% if not record.spine_is_hunched %}good{% else %}bad{% endif %}">
-                                    {% if record.spine_is_hunched %}굽음{% else %}정상{% endif %}
+                                <div class="detail-label">감지된 측면</div>
+                                <div class="detail-value">
+                                    {% if record.detected_side == 'left' %}좌측면
+                                    {% elif record.detected_side == 'right' %}우측면
+                                    {% elif record.detected_side == 'front' %}정면
+                                    {% else %}알 수 없음{% endif %}
                                 </div>
                             </div>
                             
                             <div class="detail-item">
-                                <div class="detail-label">어깨 비대칭</div>
-                                <div class="detail-value {% if not record.shoulder_is_asymmetric %}good{% else %}bad{% endif %}">
-                                    {% if record.shoulder_is_asymmetric %}비대칭{% else %}정상{% endif %}
+                                <div class="detail-label">ML 신뢰도</div>
+                                <div class="detail-value {% if record.ml_confidence and record.ml_confidence > 0.8 %}good{% elif record.ml_confidence and record.ml_confidence > 0.6 %}warning{% else %}bad{% endif %}">
+                                    {{ "%.1f"|format(record.ml_confidence * 100) if record.ml_confidence else '0.0' }}%
                                 </div>
                             </div>
                             
                             <div class="detail-item">
-                                <div class="detail-label">골반 기울기</div>
-                                <div class="detail-value {% if not record.pelvic_is_tilted %}good{% else %}bad{% endif %}">
-                                    {% if record.pelvic_is_tilted %}기울어짐{% else %}정상{% endif %}
+                                <div class="detail-label">피드백 메시지</div>
+                                <div class="detail-value">
+                                    {{ record.feedback_message if record.feedback_message else '분석 완료' }}
                                 </div>
                             </div>
                             
                             <div class="detail-item">
-                                <div class="detail-label">척추 틀어짐</div>
-                                <div class="detail-value {% if not record.spine_is_twisted %}good{% else %}bad{% endif %}">
-                                    {% if record.spine_is_twisted %}있음{% else %}정상{% endif %}
+                                <div class="detail-label">프레임 번호</div>
+                                <div class="detail-value">
+                                    {{ record.frame_count if record.frame_count else '0' }}
                                 </div>
                             </div>
                         </div>
@@ -351,9 +355,9 @@
                 
             {% else %}
                 <div class="no-records">
-                    <h3>아직 분석 기록이 없습니다</h3>
-                    <p>자세 분석을 시작하여 첫 번째 기록을 만들어보세요!</p>
-                    <a href="{{ url_for('crud.index') }}" class="start-analysis-btn">자세 분석 시작하기</a>
+                    <h3>아직 실시간 분석 기록이 없습니다</h3>
+                    <p>실시간 자세 분석을 시작하여 첫 번째 기록을 만들어보세요!</p>
+                    <a href="{{ url_for('realtime.realtime_analysis_page') }}" class="start-analysis-btn">실시간 분석 시작하기</a>
                 </div>
             {% endif %}
         </div>

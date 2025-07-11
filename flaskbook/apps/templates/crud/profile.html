@@ -181,6 +181,7 @@
         .grade-b { background-color: #17a2b8; }
         .grade-c { background-color: #ffc107; }
         .grade-d { background-color: #dc3545; }
+        .grade-na { background-color: #6c757d; }
         
         .grade-distribution {
             display: flex;
@@ -222,6 +223,7 @@
         .fill-b { background-color: #17a2b8; }
         .fill-c { background-color: #ffc107; }
         .fill-d { background-color: #dc3545; }
+        .fill-na { background-color: #6c757d; }
         
         .no-records {
             text-align: center;
@@ -245,7 +247,8 @@
     <nav class="navbar">
         <div class="navbar-brand">자세 분석 시스템</div>
         <ul class="navbar-nav">
-            <li><a href="{{ url_for('crud.index') }}">분석</a></li>
+            <!-- <li><a href="{{ url_for('crud.index') }}">분석</a></li> -->
+            <li><a href="{{ url_for('realtime.realtime_analysis_page') }}">실시간 분석</a></li>
             <li><a href="{{ url_for('crud.history') }}">기록</a></li>
             <li><a href="{{ url_for('crud.statistics') }}">통계</a></li>
             <li><a href="{{ url_for('auth.profile') }}">프로필</a></li>
@@ -271,42 +274,44 @@
                     <div class="stat-label">총 분석 횟수</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{{ "%.1f"|format(avg_score) }}</div>
-                    <div class="stat-label">평균 점수</div>
+                    <div class="stat-number">{{ "%.1f"|format(avg_cva_angle) }}</div>
+                    <div class="stat-label">평균 CVA 각도</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{{ grade_counts.A + grade_counts.B }}</div>
                     <div class="stat-label">양호 이상 (A+B)</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{{ grade_counts.A }}</div>
-                    <div class="stat-label">최고 등급 (A)</div>
+                    <div class="stat-number">{{ grade_counts.C }}</div>
+                    <div class="stat-label">개선 필요 (C)</div>
                 </div>
             </div>
         </div>
         
         <div class="content-grid">
             <div class="card">
-                <h3>최근 분석 기록</h3>
+                <h3>최근 실시간 분석 기록</h3>
                 <div class="recent-records">
                     {% if recent_records %}
                         {% for record in recent_records %}
                             <div class="record-item">
                                 <div class="record-date">
-                                    {{ record.analysis_date.strftime('%m월 %d일 %H:%M') }}
+                                    {{ record.timestamp.strftime('%m월 %d일 %H:%M') }}
                                 </div>
                                 <div class="record-score">
-                                    <span class="score-number">{{ record.calculate_overall_score() }}</span>
-                                    <span class="grade-badge grade-{{ record.calculate_overall_grade().lower() }}">
-                                        {{ record.calculate_overall_grade() }}
+                                    <span class="grade-badge grade-{{ record.posture_grade.lower() if record.posture_grade else 'c' }}">
+                                        {{ record.posture_grade if record.posture_grade else 'C' }}
                                     </span>
+                                    {% if record.cva_angle %}
+                                        <span style="font-size: 12px; color: #666;">{{ "%.1f"|format(record.cva_angle) }}°</span>
+                                    {% endif %}
                                 </div>
                             </div>
                         {% endfor %}
                     {% else %}
                         <div class="no-records">
-                            아직 분석 기록이 없습니다.<br>
-                            자세 분석을 시작해보세요!
+                            아직 실시간 분석 기록이 없습니다.<br>
+                            실시간 자세 분석을 시작해보세요!
                         </div>
                     {% endif %}
                 </div>
@@ -349,16 +354,7 @@
                             <span>{{ grade_counts.C }}회 {% if total_analyses > 0 %}({{ "%.1f"|format(grade_counts.C / total_analyses * 100) }}%){% else %}(0.0%){% endif %}</span>
                         </div>
                         
-                        <div class="grade-item">
-                            <div class="grade-label">
-                                <span class="grade-badge grade-d">D</span>
-                                <span>개선 필요</span>
-                            </div>
-                            <div class="grade-bar">
-                                <div class="grade-fill fill-d" data-width="{{ (grade_counts.D / total_analyses * 100)|round(1) if total_analyses > 0 else 0 }}"></div>
-                            </div>
-                            <span>{{ grade_counts.D }}회 {% if total_analyses > 0 %}({{ "%.1f"|format(grade_counts.D / total_analyses * 100) }}%){% else %}(0.0%){% endif %}</span>
-                        </div>
+
                     {% else %}
                         <div class="no-records">
                             분석 기록이 없어 통계를 표시할 수 없습니다.

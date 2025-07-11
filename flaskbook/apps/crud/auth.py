@@ -67,7 +67,7 @@ def login():
             login_user(user)
             user.update_last_login()
             flash(f'{user.username}님, 환영합니다!', 'success')
-            return redirect(url_for('crud.index'))
+            return redirect(url_for('realtime.realtime_analysis_page'))
         else:
             flash('사용자명 또는 비밀번호가 올바르지 않습니다.', 'error')
             return render_template('crud/login.html')
@@ -86,25 +86,39 @@ def logout():
 def profile():
     user = current_user
     
-    # 최근 자세 분석 기록 가져오기 (최근 10개)
-    recent_records = user.posture_records.order_by(PostureRecord.analysis_date.desc()).limit(10).all()
+    # 최근 실시간 자세 분석 기록 가져오기 (최근 10개)
+    from apps.crud.models import RealtimePostureRecord
+    recent_records = user.realtime_records.order_by(RealtimePostureRecord.timestamp.desc()).limit(10).all()
     
-    # 통계 계산
-    total_analyses = user.posture_records.count()
+    # 실시간 분석 통계 계산
+    total_analyses = user.realtime_records.count()
     if total_analyses > 0:
-        all_records = user.posture_records.all()
-        avg_score = sum(record.calculate_overall_score() for record in all_records) / total_analyses
-        grade_counts = {'A': 0, 'B': 0, 'C': 0, 'D': 0}
+        all_records = user.realtime_records.all()
+        
+        # 등급별 통계 (N/A 제외)
+        grade_counts = {'A': 0, 'B': 0, 'C': 0}
         for record in all_records:
-            grade = record.calculate_overall_grade()
-            grade_counts[grade] += 1
+            if record.posture_grade and record.posture_grade != 'N/A':
+                grade_counts[record.posture_grade] += 1
+        
+        # 평균 CVA 각도
+        valid_angles = [r.cva_angle for r in all_records if r.cva_angle is not None]
+        avg_cva_angle = sum(valid_angles) / len(valid_angles) if valid_angles else 0
+        
+        # 측면별 통계
+        side_counts = {}
+        for record in all_records:
+            side = record.detected_side if record.detected_side else 'unknown'
+            side_counts[side] = side_counts.get(side, 0) + 1
     else:
-        avg_score = 0
-        grade_counts = {'A': 0, 'B': 0, 'C': 0, 'D': 0}
+        avg_cva_angle = 0
+        grade_counts = {'A': 0, 'B': 0, 'C': 0}
+        side_counts = {}
     
     return render_template('crud/profile.html', 
                          user=user, 
                          recent_records=recent_records,
                          total_analyses=total_analyses,
-                         avg_score=avg_score,
-                         grade_counts=grade_counts) 
+                         avg_cva_angle=avg_cva_angle,
+                         grade_counts=grade_counts,
+                         side_counts=side_counts) 

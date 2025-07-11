@@ -153,6 +153,7 @@
         .grade-b { background-color: #17a2b8; }
         .grade-c { background-color: #ffc107; }
         .grade-d { background-color: #dc3545; }
+        .grade-na { background-color: #6c757d; }
         
         .grade-bar {
             flex: 1;
@@ -173,6 +174,7 @@
         .fill-b { background-color: #17a2b8; }
         .fill-c { background-color: #ffc107; }
         .fill-d { background-color: #dc3545; }
+        .fill-na { background-color: #6c757d; }
         
         .trend-chart {
             margin-top: 20px;
@@ -297,7 +299,8 @@
     <nav class="navbar">
         <div class="navbar-brand">자세 분석 시스템</div>
         <ul class="navbar-nav">
-            <li><a href="{{ url_for('crud.index') }}">분석</a></li>
+            <!-- <li><a href="{{ url_for('crud.index') }}">분석</a></li> -->
+            <li><a href="{{ url_for('realtime.realtime_analysis_page') }}">실시간 분석</a></li>
             <li><a href="{{ url_for('crud.history') }}">기록</a></li>
             <li><a href="{{ url_for('crud.statistics') }}">통계</a></li>
             <li><a href="{{ url_for('auth.profile') }}">프로필</a></li>
@@ -307,8 +310,8 @@
 
     <div class="container">
         <div class="page-header">
-            <h1 class="page-title">통계</h1>
-            <p class="page-subtitle">{{ user.username }}님의 자세 분석 통계입니다.</p>
+            <h1 class="page-title">실시간 분석 통계</h1>
+            <p class="page-subtitle">{{ user.username }}님의 실시간 자세 분석 통계입니다.</p>
         </div>
         
         <div class="stats-grid">
@@ -322,28 +325,35 @@
                             <div class="overview-label">총 분석 횟수</div>
                         </div>
                         <div class="overview-item">
-                            <div class="overview-number">{{ "%.1f"|format(avg_score) }}</div>
-                            <div class="overview-label">평균 점수</div>
-                        </div>
-                        <div class="overview-item">
-                            <div class="overview-number">{{ "%.1f"|format(recent_avg) }}</div>
-                            <div class="overview-label">최근 7일 평균</div>
+                            <div class="overview-number">{{ "%.1f"|format(avg_cva_angle) }}</div>
+                            <div class="overview-label">평균 CVA 각도</div>
                         </div>
                         <div class="overview-item">
                             <div class="overview-number">{{ grade_counts.A + grade_counts.B }}</div>
                             <div class="overview-label">양호 이상 (A+B)</div>
                         </div>
+                        <div class="overview-item">
+                            <div class="overview-number">{{ grade_counts.C }}</div>
+                            <div class="overview-label">개선 필요 (C)</div>
+                        </div>
                     </div>
                     
-                    <!-- 원형 진행률 차트 -->
+                    <!-- 측면별 분포 -->
                     <div style="text-align: center; margin-top: 20px;">
-                        <svg class="progress-ring" width="120" height="120">
-                            <circle class="bg" cx="60" cy="60" r="52"></circle>
-                            <circle class="progress" cx="60" cy="60" r="52" 
-                                    stroke-dasharray="{{ 2 * 3.14159 * 52 }}" 
-                                    stroke-dashoffset="{{ 2 * 3.14159 * 52 * (1 - avg_score / 100) }}"></circle>
-                        </svg>
-                        <div class="progress-text">{{ "%.0f"|format(avg_score) }}점</div>
+                        <h4>측면별 분석 분포</h4>
+                        <div style="display: flex; justify-content: space-around; margin-top: 10px;">
+                            {% for side, count in side_counts.items() %}
+                                <div style="text-align: center;">
+                                    <div style="font-size: 18px; font-weight: bold; color: #667eea;">{{ count }}</div>
+                                    <div style="font-size: 12px; color: #666;">
+                                        {% if side == 'left' %}좌측면
+                                        {% elif side == 'right' %}우측면
+                                        {% elif side == 'front' %}정면
+                                        {% else %}알 수 없음{% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
                 {% else %}
                     <div class="no-data">
@@ -392,14 +402,16 @@
                         
                         <div class="grade-item">
                             <div class="grade-info">
-                                <span class="grade-badge grade-d">D</span>
+                                <span class="grade-badge grade-c">C</span>
                                 <span>개선 필요</span>
                             </div>
                             <div class="grade-bar">
-                                <div class="grade-fill fill-d" data-width="{{ (grade_counts.D / total_records * 100)|round(1) if total_records > 0 else 0 }}"></div>
+                                <div class="grade-fill fill-c" data-width="{{ (grade_counts.C / total_records * 100)|round(1) if total_records > 0 else 0 }}"></div>
                             </div>
-                            <span>{{ grade_counts.D }}회 {% if total_records > 0 %}({{ "%.1f"|format(grade_counts.D / total_records * 100) }}%){% else %}(0.0%){% endif %}</span>
+                            <span>{{ grade_counts.C }}회 {% if total_records > 0 %}({{ "%.1f"|format(grade_counts.C / total_records * 100) }}%){% else %}(0.0%){% endif %}</span>
                         </div>
+                        
+
                     </div>
                 {% else %}
                     <div class="no-data">
@@ -417,8 +429,10 @@
                             <div class="month-item">
                                 <div class="month-label">{{ month }}</div>
                                 <div class="month-stats">
-                                    <div class="month-score">{{ "%.1f"|format(stats.avg_score) }}점</div>
                                     <div class="month-count">{{ stats.count }}회</div>
+                                    <div class="month-grades">
+                                        A: {{ stats.grade_counts.A }}, B: {{ stats.grade_counts.B }}, C: {{ stats.grade_counts.C }}
+                                    </div>
                                 </div>
                             </div>
                         {% endfor %}
@@ -430,49 +444,32 @@
                 {% endif %}
             </div>
             
-            <!-- 트렌드 분석 -->
+            <!-- 최근 7일 분석 -->
             <div class="stat-card">
-                <h3>트렌드 분석</h3>
+                <h3>최근 7일 분석</h3>
                 {% if total_records > 0 %}
                     <div class="trend-chart">
                         <div class="trend-item">
-                            <div class="trend-period">전체 평균</div>
-                            <div class="trend-score">{{ "%.1f"|format(avg_score) }}점</div>
-                            <div class="trend-count">{{ total_records }}회</div>
+                            <div class="trend-period">전체 분석</div>
+                            <div class="trend-score">{{ total_records }}회</div>
+                            <div class="trend-count">총 기록</div>
                         </div>
                         
                         <div class="trend-item">
                             <div class="trend-period">최근 7일</div>
-                            <div class="trend-score">{{ "%.1f"|format(recent_avg) }}점</div>
-                            <div class="trend-count">
-                                {% set recent_count = 0 %}
-                                {% for record in user.posture_records %}
-                                    {% if (record.analysis_date - now).days >= -7 %}
-                                        {% set recent_count = recent_count + 1 %}
-                                    {% endif %}
-                                {% endfor %}
-                                {{ recent_count }}회
-                            </div>
+                            <div class="trend-score">{{ recent_grade_counts.A + recent_grade_counts.B + recent_grade_counts.C }}회</div>
+                            <div class="trend-count">분석 횟수</div>
                         </div>
                         
                         <div class="trend-item">
-                            <div class="trend-period">최고 점수</div>
-                            <div class="trend-score">
-                                {% set max_score = 0 %}
-                                {% for record in user.posture_records %}
-                                    {% set score = record.calculate_overall_score() %}
-                                    {% if score > max_score %}
-                                        {% set max_score = score %}
-                                    {% endif %}
-                                {% endfor %}
-                                {{ max_score }}점
-                            </div>
-                            <div class="trend-count">최고 기록</div>
+                            <div class="trend-period">평균 CVA</div>
+                            <div class="trend-score">{{ "%.1f"|format(avg_cva_angle) }}°</div>
+                            <div class="trend-count">목 각도</div>
                         </div>
                     </div>
                 {% else %}
                     <div class="no-data">
-                        트렌드 분석을 위한 데이터가 부족합니다.
+                        분석 데이터가 부족합니다.
                     </div>
                 {% endif %}
             </div>
